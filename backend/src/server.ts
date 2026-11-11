@@ -58,11 +58,9 @@ app.get('/', (_req, res) => {
   });
 });
 
-async function startServer() {
-  await initDb();
-
-  // Auto-seed demo proposal and client on first run if database is empty
+async function initializeBackend() {
   try {
+    await initDb();
     const existing = await getAllProposals();
     if (existing.length === 0) {
       const client = await createClient({
@@ -96,23 +94,22 @@ async function startServer() {
       console.log('[SEED] Demo client and proposal auto-seeded.');
     }
   } catch (err: any) {
-    console.warn('[SEED] Auto-seed check warning:', err.message);
-  }
-
-  if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
-    app.listen(PORT, () => {
-      console.log(`===============================================`);
-      console.log(`🚀 Settle Backend running on port ${PORT}`);
-      console.log(`🔒 Zero AI Inside | Stripe Test Mode Active`);
-      console.log(`⚡ Ready for Claude MCP and Vercel Frontend`);
-      console.log(`===============================================`);
-    });
+    console.warn('[INIT] Initialization warning:', err.message);
   }
 }
 
-startServer().catch(err => {
-  console.warn('[SERVER] Startup warning:', err);
-});
+// Start background initialization without blocking handler exports
+initializeBackend().catch(err => console.warn('[INIT] Background init warning:', err));
+
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`===============================================`);
+    console.log(`🚀 Settle Backend running on port ${PORT}`);
+    console.log(`🔒 Zero AI Inside | Stripe Test Mode Active`);
+    console.log(`⚡ Ready for Claude MCP and Vercel Frontend`);
+    console.log(`===============================================`);
+  });
+}
 
 // Universal export for both Vercel Serverless (CommonJS function) and ES Module imports
 const handler = (req: any, res: any) => app(req, res);

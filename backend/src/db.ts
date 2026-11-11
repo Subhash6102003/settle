@@ -86,7 +86,8 @@ if (isPostgres) {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 2500,
+      query_timeout: 3000,
     });
     pgPool.on('error', (err) => {
       console.warn('[DB] Idle PostgreSQL client error:', err.message);
