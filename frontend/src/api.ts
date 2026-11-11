@@ -2,7 +2,7 @@ export const API_BASE =
   import.meta.env.VITE_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname.includes('localhost')
     ? 'http://localhost:5000'
-    : 'https://settle-dbqk.onrender.com');
+    : 'https://settle-dbck.onrender.com');
 
 export interface Creator {
   id: string;
