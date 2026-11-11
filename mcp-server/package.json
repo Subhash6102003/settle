@@ -1,0 +1,21 @@
+{
+  "name": "settle-mcp-server",
+  "version": "1.0.0",
+  "description": "Model Context Protocol (MCP) server for Settle — connects Claude to Settle tools with Zero AI inside",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

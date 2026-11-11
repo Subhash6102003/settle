@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "settle": {
+      "command": "node",
+      "args": [
+        "D:\\don't_know\\settle\\mcp-server\\dist\\index.js"
+      ],
+      "env": {
+        "SETTLE_API_URL": "http://localhost:5000"
+      }
+    }
+  }
+}
