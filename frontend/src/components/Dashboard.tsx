@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
   Proposal,
-  fetchProposals,
   updateProposal,
-  fetchStatusSummary,
   Creator,
   getActiveCreator,
   API_BASE
@@ -37,11 +35,12 @@ import {
 import gsap from 'gsap';
 
 interface DashboardProps {
+  creator?: Creator | null;
   onSignOut: () => void;
   onOpenLanding: () => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpenLanding }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'proposals' | 'invoices' | 'clients'>('dashboard');
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -64,17 +63,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
   const [hoveredMonth, setHoveredMonth] = useState<any | null>(null);
   const [hoveredGauge, setHoveredGauge] = useState(false);
 
-  // Creator profile state (Alex Rivera)
+  const activeCreator: Creator = creator || getActiveCreator();
+
+  // Creator profile state
   const [creatorProfile, setCreatorProfile] = useState({
-    name: 'Alex Rivera',
-    email: 'alex@apexcut.studio',
+    name: activeCreator.name || 'Studio Principal',
+    email: activeCreator.email || 'studio@settle.io',
     phone: '+1 (555) 382-9104',
-    studioName: 'Apex Cut Creative Studio',
-    currency: 'USD',
-    stripeAccountId: 'acct_1UXxyL1WqmAv4Br6',
-    bankRouting: 'Chase Bank (•••• 4912)',
+    studioName: activeCreator.studio_name || 'Creative Studio',
+    currency: activeCreator.currency || 'USD',
+    stripeAccountId: `acct_${activeCreator.id ? activeCreator.id.replace('cr_', '') : '1UXxyL1WqmAv4Br6'}`,
+    bankRouting: `${activeCreator.studio_name || 'Commercial'} Settlement Account`,
     taxId: 'XX-XXX8921',
   });
+
+  useEffect(() => {
+    const cur = creator || getActiveCreator();
+    if (cur) {
+      setCreatorProfile(prev => ({
+        ...prev,
+        name: cur.name || prev.name,
+        email: cur.email || prev.email,
+        studioName: cur.studio_name || prev.studioName,
+        currency: cur.currency || prev.currency,
+        stripeAccountId: `acct_${cur.id ? cur.id.replace('cr_', '') : '1UXxyL1WqmAv4Br6'}`,
+        bankRouting: `${cur.studio_name || 'Commercial'} Settlement Account`,
+      }));
+    }
+  }, [creator]);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
@@ -95,20 +111,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
 
-  const activeCreator: Creator = getActiveCreator();
   const gaugeRef = useRef<SVGCircleElement>(null);
 
   const loadData = async () => {
     try {
-      const [props, stat, invRes, clientRes] = await Promise.all([
-        fetchProposals(),
-        fetchStatusSummary(),
-        fetch(`${API_BASE}/api/invoices`).then(r => r.json()),
-        fetch(`${API_BASE}/api/clients`).then(r => r.json()),
+      const cur = creator || getActiveCreator();
+      const [propsRes, statRes, invRes, clientRes] = await Promise.all([
+        fetch(`${API_BASE}/api/proposals?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ proposals: [] })),
+        fetch(`${API_BASE}/api/status?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ summary: null })),
+        fetch(`${API_BASE}/api/invoices?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ invoices: [] })),
+        fetch(`${API_BASE}/api/clients?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ clients: [] })),
       ]);
 
-      setProposals(props);
-      setSummary(stat.summary);
+      setProposals(propsRes.proposals || []);
+      setSummary(statRes.summary || null);
       setInvoices(invRes.invoices || []);
       setClients(clientRes.clients || []);
       setLoading(false);
@@ -207,6 +223,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
           name: clientName,
           email: clientEmail,
           currency: activeCreator.currency || 'USD',
+          creator_id: activeCreator.id,
         }),
       });
 
@@ -217,6 +234,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
       loadData();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleSeedDemoProposal = async () => {
+    try {
+      setLoading(true);
+      const clientRes = await fetch(`${API_BASE}/api/clients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Acme Commercial Partner #204',
+          email: 'partner@acmebrand.com',
+          currency: activeCreator.currency || 'USD',
+          creator_id: activeCreator.id,
+        }),
+      });
+      const clientData = await clientRes.json();
+      const clientId = clientData.client?.id || `cli_${activeCreator.id}`;
+
+      await fetch(`${API_BASE}/api/proposals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          creator_id: activeCreator.id,
+          title: 'Commercial 4K Brand Film & Motion Suite',
+          body: 'Full post-production suite: 90s master commercial, 3x social cutdowns, color grading, Dolby Atmos mastering.',
+          deposit_percentage: 50,
+          revisions_included: 2,
+          turnaround_days: 14,
+          line_items: [
+            { description: 'Hero Brand Cut (90s 4K Master)', quantity: 1, unit_price: 2400, amount: 2400 },
+            { description: 'Social Multi-Format Cutdowns (9:16 & 1:1)', quantity: 3, unit_price: 400, amount: 1200 },
+            { description: 'Color Grading & Audio Mastering', quantity: 1, unit_price: 600, amount: 600 },
+          ],
+        }),
+      });
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Error generating sample package');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -674,13 +733,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
             ) : filteredProposals.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                 <FileText size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Proposals Found</div>
-                <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto 1rem' }}>
-                  Prompt Claude or click "New Proposal" to create one.
+                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>Welcome to {creatorProfile.studioName}</div>
+                <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '440px', margin: '0 auto 1.25rem' }}>
+                  No proposals logged yet for this studio. Connect Claude Desktop MCP using your Studio API Key, or create your first proposal directly.
                 </p>
-                <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
-                  + Create Proposal
-                </button>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
+                    + Create First Proposal
+                  </button>
+                  <button onClick={handleSeedDemoProposal} className="btn-ghost" style={{ border: '1px solid #cbd5e1' }}>
+                    ⚡ Load Sample Video Package
+                  </button>
+                </div>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -881,7 +945,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f3f7' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                 <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
-                  A
+                  {creatorProfile.name.charAt(0) || 'C'}
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{creatorProfile.name}</h3>

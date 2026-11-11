@@ -80,9 +80,10 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const invoices = await getAllInvoices();
+    const creatorId = req.query.creator_id as string | undefined;
+    const invoices = await getAllInvoices(creatorId);
     res.json({ invoices });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

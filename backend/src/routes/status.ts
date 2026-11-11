@@ -8,7 +8,7 @@ router.get('/', async (req: Request, res: Response) => {
   try {
     const creatorId = req.query.creator_id as string | undefined;
     const proposals = await getAllProposals(creatorId);
-    const invoices = await getAllInvoices();
+    const invoices = await getAllInvoices(creatorId);
 
     const openProposals = proposals.filter(p => p.status !== 'PAID');
     const acceptedProposals = proposals.filter(p => p.status === 'ACCEPTED' || p.deposit_paid === 1);

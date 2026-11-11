@@ -209,16 +209,27 @@ export async function getClientById(id: string): Promise<Client | null> {
   return localData.clients.find(c => c.id === id) || null;
 }
 
-export async function getAllClients(): Promise<Client[]> {
+export async function getAllClients(creator_id?: string): Promise<Client[]> {
   if (isPostgres && pgPool) {
     try {
-      const res = await pgPool.query(`SELECT * FROM clients ORDER BY created_at DESC`);
+      let q = `SELECT * FROM clients`;
+      const params: any[] = [];
+      if (creator_id) {
+        q += ` WHERE creator_id = $1`;
+        params.push(creator_id);
+      }
+      q += ` ORDER BY created_at DESC`;
+      const res = await pgPool.query(q, params);
       if (res.rows.length > 0) return res.rows as Client[];
     } catch (err: any) {
       console.warn('[DB] PG getAllClients failed, falling back:', err.message);
     }
   }
-  return [...localData.clients];
+  let list = localData.clients;
+  if (creator_id) {
+    list = list.filter(c => c.creator_id === creator_id);
+  }
+  return [...list];
 }
 
 // Proposal operations
@@ -386,7 +397,7 @@ export async function getAllProposals(creator_id?: string): Promise<Proposal[]> 
 
   let list = localData.proposals;
   if (creator_id) {
-    list = list.filter(p => !p.creator_id || p.creator_id === creator_id);
+    list = list.filter(p => p.creator_id === creator_id);
   }
 
   return list.map(p => ({
@@ -463,10 +474,17 @@ export async function createInvoice(invoice: Invoice): Promise<Invoice> {
   return invoice;
 }
 
-export async function getAllInvoices(): Promise<Invoice[]> {
+export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
   if (isPostgres && pgPool) {
     try {
-      const res = await pgPool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
+      let q = `SELECT * FROM invoices`;
+      const params: any[] = [];
+      if (creator_id) {
+        q += ` WHERE creator_id = $1`;
+        params.push(creator_id);
+      }
+      q += ` ORDER BY created_at DESC`;
+      const res = await pgPool.query(q, params);
       const invoices: Invoice[] = [];
       for (const inv of res.rows) {
         const client = await getClientById(inv.client_id);
@@ -478,7 +496,12 @@ export async function getAllInvoices(): Promise<Invoice[]> {
     }
   }
 
-  return localData.invoices.map(inv => ({
+  let list = localData.invoices;
+  if (creator_id) {
+    list = list.filter(inv => inv.creator_id === creator_id);
+  }
+
+  return list.map(inv => ({
     ...inv,
     client: localData.clients.find(c => c.id === inv.client_id),
   }));

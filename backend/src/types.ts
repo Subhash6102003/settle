@@ -50,6 +50,7 @@ export interface Proposal {
 
 export interface Invoice {
   id: string;
+  creator_id?: string;
   proposal_id?: string;
   client_id: string;
   amount: number;

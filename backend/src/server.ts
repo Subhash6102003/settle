@@ -65,6 +65,7 @@ async function initializeBackend() {
     if (existing.length === 0) {
       const client = await createClient({
         id: 'cli_acme_demo',
+        creator_id: 'cr_alex_rivera',
         name: 'Commercial Partner #104 (Acme Brands)',
         email: 'ap@acmebrand.com',
         currency: 'USD',
@@ -73,6 +74,7 @@ async function initializeBackend() {
         {
           id: 'prop_brand_refresh_demo',
           slug: 'acme-brand-refresh-2026',
+          creator_id: 'cr_alex_rivera',
           client_id: client.id,
           title: 'Commercial Video Post-Production & Motion Package',
           body: `Complete post-production, dynamic motion graphics, sound design, and multi-platform social cutdowns for Acme's 2026 Product Launch.\n\nDeliverables:\n- 1x 90-second 4K Master Commercial (16:9 widescreen)\n- 3x 30-second TikTok / Instagram Reels Cutdowns (9:16 vertical with burned-in dynamic captions)\n- 2x 15-second Pre-Roll Teasers\n- Commercial sync license for original audio score\n- Professional DaVinci Resolve color grade calibrated for OLED & mobile displays\n\nPayment Milestone:\n- 50% upfront deposit ($2,400) to lock schedule\n- 50% balance upon final master approval before raw ProRes export`,

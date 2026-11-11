@@ -7,10 +7,14 @@ import { Creator, getActiveCreator } from './api';
 
 export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
-  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('settle_auth_token'));
-  const [_creator, setCreator] = useState<Creator | null>(getActiveCreator());
-  // Default to showing Landing Page first!
-  const [currentView, setCurrentView] = useState<'landing' | 'app' | 'login'>('landing');
+  const [authToken, setAuthToken] = useState<string | null>(() => localStorage.getItem('settle_auth_token'));
+  const [creator, setCreator] = useState<Creator | null>(() => {
+    const token = localStorage.getItem('settle_auth_token');
+    return token ? getActiveCreator() : null;
+  });
+  const [currentView, setCurrentView] = useState<'landing' | 'app' | 'login'>(() => {
+    return localStorage.getItem('settle_auth_token') ? 'app' : 'landing';
+  });
 
   useEffect(() => {
     const handlePopState = () => {
@@ -28,9 +32,10 @@ export const App: React.FC = () => {
 
   const handleSignOut = () => {
     localStorage.removeItem('settle_auth_token');
+    localStorage.removeItem('settle_active_creator');
     setAuthToken(null);
     setCreator(null);
-    setCurrentView('landing');
+    setCurrentView('login');
   };
 
   // Route 1: Public Client Proposal & Receipt View (/p/:slug)
@@ -79,6 +84,7 @@ export const App: React.FC = () => {
   // Route 4: Authenticated Multi-Tenant Creator Studio Dashboard
   return (
     <Dashboard
+      creator={creator || getActiveCreator()}
       onSignOut={handleSignOut}
       onOpenLanding={() => setCurrentView('landing')}
     />
