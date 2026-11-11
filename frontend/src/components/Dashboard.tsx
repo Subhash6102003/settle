@@ -119,23 +119,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const [mcpTab, setMcpTab] = useState<'browser' | 'desktop'>('browser');
   const [copiedMcpUrl, setCopiedMcpUrl] = useState(false);
   const [copiedMcpJson, setCopiedMcpJson] = useState(false);
+  const [mcpStatus, setMcpStatus] = useState<{ connected: boolean; lastSeen: string | null; testing?: boolean; testResult?: string | null }>({
+    connected: false,
+    lastSeen: null,
+    testing: false,
+    testResult: null,
+  });
 
   const gaugeRef = useRef<SVGCircleElement>(null);
 
   const loadData = async () => {
     try {
       const cur = creator || getActiveCreator();
-      const [propsRes, statRes, invRes, clientRes] = await Promise.all([
+      const [propsRes, statRes, invRes, clientRes, mcpRes] = await Promise.all([
         fetch(`${API_BASE}/api/proposals?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ proposals: [] })),
         fetch(`${API_BASE}/api/status?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ summary: null })),
         fetch(`${API_BASE}/api/invoices?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ invoices: [] })),
         fetch(`${API_BASE}/api/clients?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ clients: [] })),
+        fetch(`${API_BASE}/api/mcp/status?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ connected: false })),
       ]);
 
       setProposals(propsRes.proposals || []);
       setSummary(statRes.summary || null);
       setInvoices(invRes.invoices || []);
       setClients(clientRes.clients || []);
+      if (mcpRes && typeof mcpRes.connected === 'boolean') {
+        setMcpStatus(prev => ({ ...prev, connected: mcpRes.connected, lastSeen: mcpRes.lastSeen || prev.lastSeen }));
+      }
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -419,7 +429,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
-  const browserMcpUrl = `${API_BASE}/sse?key=${activeCreator.api_key}`;
+  const browserMcpUrl = `${API_BASE}/mcp?key=${activeCreator.api_key}`;
+  const browserSseUrl = `${API_BASE}/sse?key=${activeCreator.api_key}`;
   const desktopConfigJson = JSON.stringify({
     mcpServers: {
       settle: {
@@ -443,6 +454,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     navigator.clipboard.writeText(desktopConfigJson);
     setCopiedMcpJson(true);
     setTimeout(() => setCopiedMcpJson(false), 2000);
+  };
+
+  const testMcpConnection = async () => {
+    setMcpStatus(prev => ({ ...prev, testing: true, testResult: null }));
+    try {
+      const res = await fetch(`${API_BASE}/mcp?key=${activeCreator.api_key}`);
+      const data = await res.json();
+      if (data.status === 'ready') {
+        setMcpStatus(prev => ({
+          ...prev,
+          connected: true,
+          testing: false,
+          testResult: `Success: Live MCP Server reached! 6 Commercial ledger tools operational.`,
+        }));
+      } else {
+        throw new Error('Unexpected response');
+      }
+    } catch (err: any) {
+      setMcpStatus(prev => ({
+        ...prev,
+        testing: false,
+        testResult: `Could not reach server: ${err.message}`,
+      }));
+    }
   };
 
   // Anonymized proposals (zero raw client names exposed on UI)
@@ -549,9 +584,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
               <Key size={17} color="#ff5c00" />
               MCP Protocol Token
             </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', color: '#10b981', fontSize: '0.82rem', fontWeight: 700 }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-              MCP Server Ready
+            <div
+              onClick={() => setShowKeyModal(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.65rem',
+                padding: '0.55rem 0.8rem',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                background: mcpStatus.connected ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                border: `1px solid ${mcpStatus.connected ? 'rgba(16, 185, 129, 0.25)' : 'rgba(245, 158, 11, 0.25)'}`,
+                color: mcpStatus.connected ? '#059669' : '#d97706',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                marginTop: '0.25rem',
+                transition: 'all 150ms ease',
+              }}
+              title={mcpStatus.connected ? 'MCP Server is connected to Claude' : 'MCP Server is standby • Click to connect'}
+            >
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: mcpStatus.connected ? '#10b981' : '#f59e0b',
+                  boxShadow: `0 0 6px ${mcpStatus.connected ? '#10b981' : '#f59e0b'}`,
+                }}
+              />
+              <span>{mcpStatus.connected ? 'MCP Connected' : 'MCP Standby'}</span>
             </div>
           </nav>
         </div>
@@ -1561,12 +1622,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
             {/* Tab 1: Claude Web Browser */}
             {mcpTab === 'browser' && (
               <div>
+                {/* Live Connection Heartbeat Banner */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: mcpStatus.connected ? '#ecfdf5' : '#fffbeb', border: `1px solid ${mcpStatus.connected ? '#a7f3d0' : '#fde68a'}`, borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: mcpStatus.connected ? '#10b981' : '#f59e0b', boxShadow: `0 0 6px ${mcpStatus.connected ? '#10b981' : '#f59e0b'}` }} />
+                    <span style={{ fontSize: '0.82rem', fontWeight: 700, color: mcpStatus.connected ? '#065f46' : '#92400e' }}>
+                      Status: {mcpStatus.connected ? 'MCP Server Active & Connected to Claude' : 'MCP Server Standby (Awaiting Connection)'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={testMcpConnection}
+                    disabled={mcpStatus.testing}
+                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.35rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, color: '#334155', cursor: 'pointer' }}
+                  >
+                    {mcpStatus.testing ? 'Testing...' : 'Test Server Reachability'}
+                  </button>
+                </div>
+
+                {mcpStatus.testResult && (
+                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.6rem 0.85rem', fontSize: '0.75rem', color: '#0f172a', marginBottom: '1rem', fontWeight: 600 }}>
+                    {mcpStatus.testResult}
+                  </div>
+                )}
+
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
-                    Connect to Claude.ai in Your Browser (No Terminal Needed!)
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>
+                    Connect to Claude.ai Browser (Custom Connector)
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1rem' }}>
-                    Claude.ai web now supports custom remote MCP connectors. Paste your personal live endpoint into Claude's <strong>Add custom connector</strong> dialog.
+                    Paste your personal live endpoint into Claude.ai's <strong>Add custom connector</strong> dialog.
                   </p>
 
                   <div style={{ marginBottom: '1rem' }}>
@@ -1578,10 +1663,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                     </code>
                   </div>
 
-                  <div>
+                  <div style={{ marginBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                        2. MCP Server URL (HTTPS)
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>
+                        2. Recommended MCP URL (Streamable HTTP)
                       </span>
                       <button
                         type="button"
@@ -1589,20 +1674,45 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                         style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                       >
                         {copiedMcpUrl ? <Check size={14} /> : null}
-                        {copiedMcpUrl ? 'Copied URL!' : 'Copy MCP Server URL'}
+                        {copiedMcpUrl ? 'Copied!' : 'Copy Streamable URL'}
                       </button>
                     </div>
                     <code style={{ fontSize: '0.78rem', color: '#0f172a', background: '#fff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'block', wordBreak: 'break-all', lineHeight: 1.4 }}>
                       {browserMcpUrl}
                     </code>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.3rem' }}>
+                      ✨ Anthropic recommends Streamable HTTP to prevent the SSE deprecation warning.
+                    </p>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        Alternative: SSE Transport URL
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(browserSseUrl);
+                          setReminderToast('Copied SSE URL');
+                          setTimeout(() => setReminderToast(null), 2000);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Copy SSE URL
+                      </button>
+                    </div>
+                    <code style={{ fontSize: '0.75rem', color: '#64748b', background: '#f1f5f9', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block', wordBreak: 'break-all' }}>
+                      {browserSseUrl}
+                    </code>
                   </div>
                 </div>
 
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.9rem 1rem', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.5, marginBottom: '1.5rem' }}>
-                  <strong>How to use in Claude.ai Browser:</strong><br />
+                  <strong>How to connect in Claude.ai Browser:</strong><br />
                   1. In Claude.ai, open left menu → <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add custom connector</strong>.<br />
-                  2. In the modal, enter <strong>Name:</strong> <code>Settle</code>.<br />
-                  3. In <strong>MCP server URL:</strong> paste the URL copied above.<br />
+                  2. In <strong>Name:</strong> enter <code>Settle</code>.<br />
+                  3. In <strong>MCP server URL:</strong> paste the <strong>Recommended Streamable URL</strong> copied above.<br />
                   4. Click <strong>Continue</strong>. Claude will instantly gain access to your Settle ledger!
                 </div>
               </div>
