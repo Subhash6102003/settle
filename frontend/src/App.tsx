@@ -9,7 +9,8 @@ export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
   const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('settle_auth_token'));
   const [_creator, setCreator] = useState<Creator | null>(getActiveCreator());
-  const [isLandingView, setIsLandingView] = useState(false);
+  // Default to showing Landing Page first!
+  const [currentView, setCurrentView] = useState<'landing' | 'app' | 'login'>('landing');
 
   useEffect(() => {
     const handlePopState = () => {
@@ -22,13 +23,14 @@ export const App: React.FC = () => {
   const handleLoginSuccess = (user: Creator, token: string) => {
     setCreator(user);
     setAuthToken(token);
-    setIsLandingView(false);
+    setCurrentView('app');
   };
 
   const handleSignOut = () => {
     localStorage.removeItem('settle_auth_token');
     setAuthToken(null);
     setCreator(null);
+    setCurrentView('landing');
   };
 
   // Route 1: Public Client Proposal & Receipt View (/p/:slug)
@@ -37,11 +39,18 @@ export const App: React.FC = () => {
     return <ProposalView slug={slug} />;
   }
 
-  // Route 2: Product Landing Page (Accessible anytime)
-  if (isLandingView) {
+  // Route 2: Landing Page (Default View)
+  if (currentView === 'landing') {
     return (
       <LandingPage
-        onGoToApp={() => setIsLandingView(false)}
+        onGoToApp={() => {
+          if (authToken) {
+            setCurrentView('app');
+          } else {
+            setCurrentView('login');
+          }
+        }}
+        onGoToLogin={() => setCurrentView('login')}
         onViewDemoProposal={() => {
           window.location.pathname = '/p/acme-brand-refresh-2026';
         }}
@@ -49,17 +58,17 @@ export const App: React.FC = () => {
     );
   }
 
-  // Route 3: Creator Authentication Gate (If not logged in, show AuthScreen with option to view landing page)
-  if (!authToken) {
+  // Route 3: Auth Screen (If user wants to sign in or register)
+  if (currentView === 'login' && !authToken) {
     return (
       <div>
         <div style={{ position: 'fixed', top: '15px', right: '20px', zIndex: 100 }}>
           <button
-            onClick={() => setIsLandingView(true)}
+            onClick={() => setCurrentView('landing')}
             className="btn-ghost"
             style={{ fontSize: '0.85rem', padding: '0.45rem 0.85rem' }}
           >
-            Explore Product Tour ↗
+            ← Back to Landing Page
           </button>
         </div>
         <AuthScreen onLoginSuccess={handleLoginSuccess} />
@@ -67,11 +76,11 @@ export const App: React.FC = () => {
     );
   }
 
-  // Route 4: Authenticated Multi-Tenant Creator Studio
+  // Route 4: Authenticated Multi-Tenant Creator Studio Dashboard
   return (
     <Dashboard
       onSignOut={handleSignOut}
-      onOpenLanding={() => setIsLandingView(true)}
+      onOpenLanding={() => setCurrentView('landing')}
     />
   );
 };
