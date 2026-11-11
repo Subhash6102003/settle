@@ -22,23 +22,23 @@ app.use(cors({
 }));
 
 // Raw body parser for Stripe webhooks, JSON parser for standard APIs
-app.use('/api/webhooks', express.raw({ type: 'application/json' }));
+app.use(['/api/webhooks', '/webhooks'], express.raw({ type: 'application/json' }));
 app.use(express.json());
 
-// API Routes
-app.use('/api/auth', authRouter);
-app.use('/api/clients', clientsRouter);
-app.use('/api/proposals', proposalsRouter);
-app.use('/api/invoices', invoicesRouter);
-app.use('/api/status', statusRouter);
-app.use('/api/webhooks', webhooksRouter);
+// API Routes (mounted with and without /api prefix for universal proxy compatibility)
+app.use(['/api/auth', '/auth'], authRouter);
+app.use(['/api/clients', '/clients'], clientsRouter);
+app.use(['/api/proposals', '/proposals'], proposalsRouter);
+app.use(['/api/invoices', '/invoices'], invoicesRouter);
+app.use(['/api/status', '/status'], statusRouter);
+app.use(['/api/webhooks', '/webhooks'], webhooksRouter);
 
-// Health check endpoint (for AWS EC2 load balancer / status checks)
-app.get('/health', (_req, res) => {
+// Health check endpoint
+app.get(['/health', '/api/health'], (_req, res) => {
   res.json({
     status: 'healthy',
     product: 'Settle',
-    architecture: 'Zero AI Inside (Runs on Claude via MCP)',
+    architecture: 'Zero AI Inside (Runs on Claude & MCP)',
     timestamp: new Date().toISOString(),
   });
 });

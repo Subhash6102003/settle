@@ -3,7 +3,7 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "express"
+      "entrypoint": "api/index.ts"
     },
     "frontend": {
       "root": "frontend",
