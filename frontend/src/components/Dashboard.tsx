@@ -115,6 +115,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const [clientEmail, setClientEmail] = useState('');
   const [clientCurrency, setClientCurrency] = useState(activeCreator.currency || 'INR');
 
+  // MCP Connection modal state
+  const [mcpTab, setMcpTab] = useState<'browser' | 'desktop'>('browser');
+  const [copiedMcpUrl, setCopiedMcpUrl] = useState(false);
+  const [copiedMcpJson, setCopiedMcpJson] = useState(false);
+
   const gaugeRef = useRef<SVGCircleElement>(null);
 
   const loadData = async () => {
@@ -412,6 +417,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     navigator.clipboard.writeText(activeCreator.api_key);
     setCopiedKey(true);
     setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const browserMcpUrl = `${API_BASE}/sse?key=${activeCreator.api_key}`;
+  const desktopConfigJson = JSON.stringify({
+    mcpServers: {
+      settle: {
+        command: "node",
+        args: ["D:\\don't_know\\settle\\mcp-server\\dist\\index.js"],
+        env: {
+          SETTLE_API_URL: API_BASE,
+          SETTLE_API_KEY: activeCreator.api_key
+        }
+      }
+    }
+  }, null, 2);
+
+  const copyBrowserUrl = () => {
+    navigator.clipboard.writeText(browserMcpUrl);
+    setCopiedMcpUrl(true);
+    setTimeout(() => setCopiedMcpUrl(false), 2000);
+  };
+
+  const copyDesktopJson = () => {
+    navigator.clipboard.writeText(desktopConfigJson);
+    setCopiedMcpJson(true);
+    setTimeout(() => setCopiedMcpJson(false), 2000);
   };
 
   // Anonymized proposals (zero raw client names exposed on UI)
@@ -1471,39 +1502,148 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
         </div>
       )}
 
-      {/* Modal 5: Claude MCP Secret Token */}
+      {/* Modal 5: Model Context Protocol (MCP) Connect */}
       {showKeyModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 60 }}>
-          <div className="card-white" style={{ maxWidth: '520px', width: '100%', padding: '2rem' }}>
+          <div className="card-white" style={{ maxWidth: '640px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Model Context Protocol (MCP) Token</h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Universal multi-tenant agent authentication token</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Connect Claude to Your Studio (MCP)</h3>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Zero AI inside Settle • Let external Claude manage your contracts & billing</p>
               </div>
               <button onClick={() => setShowKeyModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
               </button>
             </div>
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Your Personal MCP Token</span>
-                <button onClick={copyApiKey} style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  {copiedKey ? <Check size={13} /> : null}
-                  {copiedKey ? 'Copied' : 'Copy Token'}
-                </button>
-              </div>
-              <code style={{ fontSize: '0.82rem', color: '#0f172a', background: '#ffffff', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block', wordBreak: 'break-all' }}>
-                {activeCreator.api_key}
-              </code>
-              <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.4rem', lineHeight: 1.5 }}>
-                Compatible with any MCP-enabled assistant (Claude Desktop, ChatGPT, Cursor, Windsurf, or custom agent). Set <code>SETTLE_API_KEY</code> so all generated agreements link to your studio ledger.
-              </p>
+            {/* MCP Platform Switcher Tabs */}
+            <div style={{ display: 'flex', gap: '0.5rem', background: '#f1f5f9', padding: '0.3rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setMcpTab('browser')}
+                style={{
+                  flex: 1,
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: mcpTab === 'browser' ? '#ffffff' : 'transparent',
+                  color: mcpTab === 'browser' ? '#0f172a' : '#64748b',
+                  fontWeight: mcpTab === 'browser' ? 700 : 500,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: mcpTab === 'browser' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                🌐 Claude Browser (Web Connector)
+              </button>
+              <button
+                type="button"
+                onClick={() => setMcpTab('desktop')}
+                style={{
+                  flex: 1,
+                  padding: '0.6rem 0.8rem',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: mcpTab === 'desktop' ? '#ffffff' : 'transparent',
+                  color: mcpTab === 'desktop' ? '#0f172a' : '#64748b',
+                  fontWeight: mcpTab === 'desktop' ? 700 : 500,
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  boxShadow: mcpTab === 'desktop' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 150ms ease',
+                }}
+              >
+                💻 Claude Desktop & Cursor (JSON)
+              </button>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowKeyModal(false)} className="btn-orange" style={{ width: '100%' }}>
-                Done
+            {/* Tab 1: Claude Web Browser */}
+            {mcpTab === 'browser' && (
+              <div>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem' }}>
+                    Connect to Claude.ai in Your Browser (No Terminal Needed!)
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1rem' }}>
+                    Claude.ai web now supports custom remote MCP connectors. Paste your personal live endpoint into Claude's <strong>Add custom connector</strong> dialog.
+                  </p>
+
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
+                      1. Connector Name
+                    </div>
+                    <code style={{ fontSize: '0.85rem', color: '#0f172a', background: '#fff', padding: '0.45rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'block', fontWeight: 700 }}>
+                      Settle
+                    </code>
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                        2. MCP Server URL (HTTPS)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyBrowserUrl}
+                        style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        {copiedMcpUrl ? <Check size={14} /> : null}
+                        {copiedMcpUrl ? 'Copied URL!' : 'Copy MCP Server URL'}
+                      </button>
+                    </div>
+                    <code style={{ fontSize: '0.78rem', color: '#0f172a', background: '#fff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'block', wordBreak: 'break-all', lineHeight: 1.4 }}>
+                      {browserMcpUrl}
+                    </code>
+                  </div>
+                </div>
+
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.9rem 1rem', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+                  <strong>How to use in Claude.ai Browser:</strong><br />
+                  1. In Claude.ai, open left menu → <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add custom connector</strong>.<br />
+                  2. In the modal, enter <strong>Name:</strong> <code>Settle</code>.<br />
+                  3. In <strong>MCP server URL:</strong> paste the URL copied above.<br />
+                  4. Click <strong>Continue</strong>. Claude will instantly gain access to your Settle ledger!
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Claude Desktop & Cursor JSON */}
+            {mcpTab === 'desktop' && (
+              <div>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                      claude_desktop_config.json
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyDesktopJson}
+                      style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                    >
+                      {copiedMcpJson ? <Check size={14} /> : null}
+                      {copiedMcpJson ? 'Copied JSON!' : 'Copy Config JSON'}
+                    </button>
+                  </div>
+                  <pre style={{ fontSize: '0.75rem', color: '#0f172a', background: '#ffffff', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', overflowX: 'auto', margin: 0, lineHeight: 1.45 }}>
+                    {desktopConfigJson}
+                  </pre>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1.5rem' }}>
+                  <strong>Config File Locations:</strong><br />
+                  • <strong>Claude Desktop (Windows):</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code><br />
+                  • <strong>Cursor IDE:</strong> <code>.cursor/mcp.json</code> inside your project directory.
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                Your API Key: <code style={{ color: '#0f172a', fontWeight: 700 }}>{activeCreator.api_key}</code>
+              </div>
+              <button onClick={() => setShowKeyModal(false)} className="btn-orange" style={{ minWidth: '120px' }}>
+                Close
               </button>
             </div>
           </div>

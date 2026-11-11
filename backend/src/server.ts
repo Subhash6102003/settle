@@ -10,6 +10,7 @@ import invoicesRouter from './routes/invoices';
 import statusRouter from './routes/status';
 import webhooksRouter from './routes/webhooks';
 import authRouter from './routes/auth';
+import { setupMcpRoutes } from './mcpEndpoint';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -53,6 +54,9 @@ app.use(['/api/proposals', '/proposals'], proposalsRouter);
 app.use(['/api/invoices', '/invoices'], invoicesRouter);
 app.use(['/api/status', '/status'], statusRouter);
 app.use(['/api/webhooks', '/webhooks'], webhooksRouter);
+
+// Mount Remote MCP Server over SSE (Claude Browser Connectors)
+setupMcpRoutes(app);
 
 // Health check endpoint
 app.get(['/health', '/api/health'], (_req, res) => {

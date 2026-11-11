@@ -54,6 +54,7 @@ export interface Invoice {
   proposal_id?: string;
   client_id: string;
   amount: number;
+  currency?: string;
   due_date?: string;
   status: 'UNPAID' | 'PAID' | 'OVERDUE';
   stripe_checkout_session_id?: string;
