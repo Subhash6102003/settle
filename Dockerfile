@@ -21,6 +21,6 @@ RUN npm install --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
-EXPOSE 5000
+EXPOSE 10000 5000
 
 CMD ["node", "dist/server.js"]

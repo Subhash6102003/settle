@@ -12,7 +12,7 @@ import webhooksRouter from './routes/webhooks';
 import authRouter from './routes/auth';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // Enable CORS for frontend and Claude Desktop
 app.use(cors({
@@ -102,11 +102,11 @@ async function initializeBackend() {
 initializeBackend().catch(err => console.warn('[INIT] Background init warning:', err));
 
 if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
-  app.listen(PORT, () => {
+  app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`===============================================`);
-    console.log(`🚀 Settle Backend running on port ${PORT}`);
+    console.log(`🚀 Settle Backend running on 0.0.0.0:${PORT}`);
     console.log(`🔒 Zero AI Inside | Stripe Test Mode Active`);
-    console.log(`⚡ Ready for Claude MCP and Vercel Frontend`);
+    console.log(`⚡ Ready for Claude MCP, Render and Vercel`);
     console.log(`===============================================`);
   });
 }
