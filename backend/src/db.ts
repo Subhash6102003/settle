@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import path from 'path';
 import fs from 'fs';
 import { Client, Proposal, LineItem, Invoice, Creator } from './types';
+import { nanoid } from 'nanoid';
 
 const isPostgres = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
 
@@ -381,11 +382,44 @@ export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null
     try {
       const res = await pgPool.query(`SELECT * FROM creators WHERE api_key = $1`, [apiKey]);
       if (res.rows[0]) return res.rows[0] as Creator;
+      
+      if (apiKey.startsWith('stl_live_')) {
+        const newLiveCreator: Creator = {
+          id: `cr_${nanoid(10)}`,
+          name: 'My Creator Studio',
+          email: `${apiKey.slice(0, 16)}@settle.studio`,
+          studio_name: 'My Creator Studio',
+          currency: 'INR',
+          api_key: apiKey,
+          plan: 'Pro',
+        };
+        await createCreator(newLiveCreator);
+        return newLiveCreator;
+      }
     } catch (err: any) {
       console.warn('[DB] PG getCreatorByApiKey failed, falling back:', err.message);
     }
   }
-  return localData.creators.find(c => c.api_key === apiKey) || null;
+
+  const existing = localData.creators.find(c => c.api_key === apiKey);
+  if (existing) return existing;
+
+  if (apiKey.startsWith('stl_live_')) {
+    const newLiveCreator: Creator = {
+      id: `cr_${nanoid(10)}`,
+      name: 'My Creator Studio',
+      email: `${apiKey.slice(0, 16)}@settle.studio`,
+      studio_name: 'My Creator Studio',
+      currency: 'INR',
+      api_key: apiKey,
+      plan: 'Pro',
+    };
+    localData.creators.push(newLiveCreator);
+    saveLocalData();
+    return newLiveCreator;
+  }
+
+  return null;
 }
 
 export async function getProposalBySlug(slug: string): Promise<Proposal | null> {
