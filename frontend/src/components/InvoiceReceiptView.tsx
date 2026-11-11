@@ -40,6 +40,7 @@ interface InvoiceData {
     address?: string;
     tax_id?: string;
   };
+  items?: any[];
 }
 
 interface InvoiceReceiptViewProps {
@@ -220,6 +221,9 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({ invoiceI
 
           {/* Itemized Line Items Table */}
           <div style={{ marginBottom: '2.5rem' }}>
+            <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ff5c00', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+              Itemized Milestone Deliverables & Engineering Scope
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b', background: '#f8fafc' }}>
@@ -230,25 +234,80 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({ invoiceI
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid #f1f3f7' }}>
-                  <td style={{ padding: '1rem', color: '#0f172a' }}>
-                    <div style={{ fontWeight: 700 }}>Commercial Production & Post-Production Milestone</div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
-                      Primary creative deliverable, master exports, and commercial licensing rights.
-                    </div>
-                  </td>
-                  <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>
-                    1
-                  </td>
-                  <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#64748b' }}>
-                    {sym}{Number(invoice.amount).toLocaleString()}.00
-                  </td>
-                  <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
-                    {sym}{Number(invoice.amount).toLocaleString()}.00
-                  </td>
-                </tr>
+                {invoice.items && invoice.items.length > 0 ? (
+                  invoice.items.map((item, idx) => (
+                    <tr key={idx} style={{ borderBottom: '1px solid #f1f3f7' }}>
+                      <td style={{ padding: '1rem', color: '#0f172a' }}>
+                        <div style={{ fontWeight: 700 }}>{item.description}</div>
+                        {item.spec && (
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
+                            {item.spec}
+                          </div>
+                        )}
+                      </td>
+                      <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>
+                        {item.quantity || 1}
+                      </td>
+                      <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#64748b' }}>
+                        {sym}{Number(item.unit_price || item.amount).toLocaleString()}.00
+                      </td>
+                      <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
+                        {sym}{Number(item.amount).toLocaleString()}.00
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr style={{ borderBottom: '1px solid #f1f3f7' }}>
+                    <td style={{ padding: '1rem', color: '#0f172a' }}>
+                      <div style={{ fontWeight: 700 }}>AI Code Editor Desktop Application + Local LLM Runtime Engine</div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        Full production deliverable: React 19 + Electron.js desktop IDE with local on-device LLM autonomous code generation.
+                      </div>
+                    </td>
+                    <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'center', color: '#64748b' }}>
+                      1
+                    </td>
+                    <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#64748b' }}>
+                      {sym}{Number(invoice.amount).toLocaleString()}.00
+                    </td>
+                    <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
+                      {sym}{Number(invoice.amount).toLocaleString()}.00
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Technical Architecture & Stack Dossier */}
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.5rem', marginBottom: '2.5rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>
+              Technical Architecture & Delivered System Dossier
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', fontSize: '0.82rem', color: '#334155', lineHeight: 1.55 }}>
+              <div>
+                <strong>1. Desktop IDE Shell (Electron.js + React 19):</strong><br />
+                Multi-tab Monaco code editor, file-tree explorer, native terminal integration, and hardware-accelerated 150ms composite transitions.
+              </div>
+              <div>
+                <strong>2. Local LLM Runtime Integration:</strong><br />
+                Direct desktop bridge to locally running LLM engines (Ollama / Llama.cpp) enabling 100% offline, zero-latency, private AI code generation.
+              </div>
+              <div>
+                <strong>3. Autonomous Agentic Code Engine:</strong><br />
+                Boil-the-ocean code diff streaming, AST patch validation, multi-turn pair programming prompt profiles, and workspace file synchronization.
+              </div>
+              <div>
+                <strong>4. Extensible Tool Protocol (MCP):</strong><br />
+                Integrated Model Context Protocol client allowing local LLM to execute shell commands, edit files, and read project repos deterministically.
+              </div>
+            </div>
+          </div>
+
+          {/* Legal IP Assignment & Warranty Guarantee */}
+          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.25rem 1.5rem', marginBottom: '2.5rem', fontSize: '0.8rem', color: '#64748b', lineHeight: 1.6 }}>
+            <strong style={{ color: '#0f172a' }}>Intellectual Property Assignment & Source Code Warranty:</strong><br />
+            Upon milestone payment clearance, 100% of all intellectual property, git repository branches, Electron desktop binary signing certificates, and proprietary local LLM orchestration logic are assigned exclusively and irrevocably to <strong>Subhash Maurya</strong>. Deliverables are warranted to be free of defects and compliant with master architectural specifications.
           </div>
 
           {/* Calculation Breakdown */}

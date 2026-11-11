@@ -637,6 +637,10 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
         const inv = res.rows[0] as Invoice;
         const client = await getClientById(inv.client_id);
         const creator = await getCreatorById(inv.creator_id || client?.creator_id || 'cr_alex_rivera');
+        if (inv.proposal_id) {
+          const itemsRes = await pgPool.query(`SELECT * FROM line_items WHERE proposal_id = $1`, [inv.proposal_id]);
+          inv.items = itemsRes.rows;
+        }
         return { ...inv, client: client || undefined, creator: creator || undefined };
       }
     } catch (err: any) {
@@ -649,11 +653,13 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
 
   const client = localData.clients.find(c => c.id === invoice.client_id);
   const creator = localData.creators.find(c => c.id === invoice.creator_id) || localData.creators[0];
+  const items = invoice.proposal_id ? localData.line_items.filter(i => i.proposal_id === invoice.proposal_id) : (invoice.items || []);
 
   return {
     ...invoice,
     client,
     creator,
+    items,
   };
 }
 
