@@ -60,16 +60,21 @@ app.get('/', (_req, res) => {
 
 async function startServer() {
   await initDb();
-  app.listen(PORT, () => {
-    console.log(`===============================================`);
-    console.log(`🚀 Settle Backend running on port ${PORT}`);
-    console.log(`🔒 Zero AI Inside | Stripe Test Mode Active`);
-    console.log(`⚡ Ready for Claude MCP and Vercel Frontend`);
-    console.log(`===============================================`);
-  });
+  if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+    app.listen(PORT, () => {
+      console.log(`===============================================`);
+      console.log(`🚀 Settle Backend running on port ${PORT}`);
+      console.log(`🔒 Zero AI Inside | Stripe Test Mode Active`);
+      console.log(`⚡ Ready for Claude MCP and Vercel Frontend`);
+      console.log(`===============================================`);
+    });
+  }
 }
 
 startServer().catch(err => {
   console.error('Fatal startup error:', err);
   process.exit(1);
 });
+
+export default app;
+export { app };
