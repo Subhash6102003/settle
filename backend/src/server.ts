@@ -12,7 +12,7 @@ import webhooksRouter from './routes/webhooks';
 import authRouter from './routes/auth';
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 5000;
 
 // Enable CORS for frontend and Claude Desktop
 app.use(cors({

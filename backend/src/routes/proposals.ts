@@ -20,6 +20,7 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const {
       client_id,
+      creator_id,
       title,
       body,
       line_items = [],
@@ -27,6 +28,7 @@ router.post('/', async (req: Request, res: Response) => {
       revisions_included = 2,
       turnaround_days = 14,
       currency,
+      slug: customSlug,
     } = req.body;
 
     if (!client_id || !title || !body) {
@@ -56,13 +58,14 @@ router.post('/', async (req: Request, res: Response) => {
     });
 
     const depositAmount = Math.round(((total * (deposit_percentage / 100))) * 100) / 100;
-    const slug = slugify(title);
+    const slug = customSlug ? customSlug.toLowerCase().trim() : slugify(title);
     const proposalId = `prop_${nanoid(10)}`;
 
     const proposal = await createProposal(
       {
         id: proposalId,
         slug,
+        creator_id: creator_id || client.creator_id || 'cr_alex_rivera',
         client_id,
         title,
         body,
