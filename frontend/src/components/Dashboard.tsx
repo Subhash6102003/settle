@@ -5,7 +5,8 @@ import {
   updateProposal,
   fetchStatusSummary,
   Creator,
-  getActiveCreator
+  getActiveCreator,
+  API_BASE
 } from '../api';
 import {
   FileText,
@@ -39,8 +40,6 @@ interface DashboardProps {
   onSignOut: () => void;
   onOpenLanding: () => void;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'proposals' | 'invoices' | 'clients'>('dashboard');

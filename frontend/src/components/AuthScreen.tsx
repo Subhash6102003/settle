@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Creator, setActiveCreator } from '../api';
+import { Creator, setActiveCreator, API_BASE } from '../api';
 import { ArrowRight, Lock, Mail, Building, User } from 'lucide-react';
 
 interface AuthScreenProps {
   onLoginSuccess: (creator: Creator, token: string) => void;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const [isRegister, setIsRegister] = useState(false);
