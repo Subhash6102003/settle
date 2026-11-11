@@ -6,7 +6,10 @@ import { Client, Proposal, LineItem, Invoice, Creator } from './types';
 const isPostgres = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
 
 let pgPool: Pool | null = null;
-const jsonDbPath = path.resolve(__dirname, '..', 'data', 'store.json');
+const isVercel = Boolean(process.env.VERCEL);
+const jsonDbPath = isVercel
+  ? path.resolve('/tmp', 'store.json')
+  : path.resolve(__dirname, '..', 'data', 'store.json');
 
 interface SchemaData {
   creators: Creator[];
@@ -57,12 +60,9 @@ function loadLocalData(): void {
         line_items: parsed.line_items || [],
         invoices: parsed.invoices || [],
       };
-      saveLocalData();
-    } else {
-      saveLocalData();
     }
   } catch (err) {
-    console.error('[DB] Error loading local store:', err);
+    console.warn('[DB] Warning loading local store:', err);
   }
 }
 
@@ -74,22 +74,33 @@ function saveLocalData(): void {
     }
     fs.writeFileSync(jsonDbPath, JSON.stringify(localData, null, 2), 'utf-8');
   } catch (err) {
-    console.error('[DB] Error saving local store:', err);
+    console.warn('[DB] Warning saving local store:', err);
   }
 }
 
+// Initialize in-memory data
+loadLocalData();
+
 if (isPostgres) {
-  pgPool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-  });
-  console.log('[DB] Connected to PostgreSQL / AWS RDS');
-} else {
-  loadLocalData();
-  console.log('[DB] Using local file-backed store at', jsonDbPath);
+  try {
+    pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 5000,
+    });
+    pgPool.on('error', (err) => {
+      console.warn('[DB] Idle PostgreSQL client error:', err.message);
+    });
+    console.log('[DB] PostgreSQL pool initialized');
+  } catch (err: any) {
+    console.warn('[DB] Failed to initialize PostgreSQL pool:', err.message);
+    pgPool = null;
+  }
 }
 
 export async function initDb(): Promise<void> {
+  loadLocalData();
+
   if (isPostgres && pgPool) {
     try {
       await pgPool.query(`
@@ -162,22 +173,23 @@ export async function initDb(): Promise<void> {
       `);
       console.log('[DB] PostgreSQL schemas verified and self-initialized.');
     } catch (e: any) {
-      console.error('[DB] PostgreSQL schema initialization warning:', e.message);
+      console.warn('[DB] PostgreSQL schema warning, using in-memory store:', e.message);
     }
-  } else {
-    loadLocalData();
-    console.log('[DB] Local store initialized with', localData.proposals.length, 'proposals.');
   }
 }
 
 // Client operations
 export async function createClient(client: Client): Promise<Client> {
   if (isPostgres && pgPool) {
-    await pgPool.query(
-      `INSERT INTO clients (id, name, email, currency) VALUES ($1, $2, $3, $4)`,
-      [client.id, client.name, client.email, client.currency || 'USD']
-    );
-    return client;
+    try {
+      await pgPool.query(
+        `INSERT INTO clients (id, name, email, currency) VALUES ($1, $2, $3, $4)`,
+        [client.id, client.name, client.email, client.currency || 'USD']
+      );
+      return client;
+    } catch (err: any) {
+      console.warn('[DB] PG createClient failed, falling back:', err.message);
+    }
   }
   localData.clients.push(client);
   saveLocalData();
@@ -186,16 +198,24 @@ export async function createClient(client: Client): Promise<Client> {
 
 export async function getClientById(id: string): Promise<Client | null> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM clients WHERE id = $1`, [id]);
-    return (res.rows[0] as Client) || null;
+    try {
+      const res = await pgPool.query(`SELECT * FROM clients WHERE id = $1`, [id]);
+      if (res.rows[0]) return res.rows[0] as Client;
+    } catch (err: any) {
+      console.warn('[DB] PG getClientById failed, falling back:', err.message);
+    }
   }
   return localData.clients.find(c => c.id === id) || null;
 }
 
 export async function getAllClients(): Promise<Client[]> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM clients ORDER BY created_at DESC`);
-    return res.rows as Client[];
+    try {
+      const res = await pgPool.query(`SELECT * FROM clients ORDER BY created_at DESC`);
+      if (res.rows.length > 0) return res.rows as Client[];
+    } catch (err: any) {
+      console.warn('[DB] PG getAllClients failed, falling back:', err.message);
+    }
   }
   return [...localData.clients];
 }
@@ -206,34 +226,39 @@ export async function createProposal(
   items: Omit<LineItem, 'id' | 'proposal_id'>[]
 ): Promise<Proposal> {
   if (isPostgres && pgPool) {
-    await pgPool.query(
-      `INSERT INTO proposals (id, slug, client_id, title, body, status, total_amount, deposit_amount, deposit_paid, currency, revisions_included, turnaround_days)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-      [
-        proposal.id,
-        proposal.slug,
-        proposal.client_id,
-        proposal.title,
-        proposal.body,
-        proposal.status || 'DRAFT',
-        proposal.total_amount,
-        proposal.deposit_amount,
-        proposal.deposit_paid || 0,
-        proposal.currency || 'USD',
-        proposal.revisions_included || 2,
-        proposal.turnaround_days || 14,
-      ]
-    );
-
-    for (const item of items) {
-      const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    try {
       await pgPool.query(
-        `INSERT INTO line_items (id, proposal_id, description, quantity, unit_price, amount) VALUES ($1, $2, $3, $4, $5, $6)`,
-        [itemId, proposal.id, item.description, item.quantity, item.unit_price, item.amount]
+        `INSERT INTO proposals (id, slug, client_id, title, body, status, total_amount, deposit_amount, deposit_paid, currency, revisions_included, turnaround_days)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          proposal.id,
+          proposal.slug,
+          proposal.client_id,
+          proposal.title,
+          proposal.body,
+          proposal.status || 'SENT',
+          proposal.total_amount,
+          proposal.deposit_amount,
+          proposal.deposit_paid || 0,
+          proposal.currency || 'USD',
+          proposal.revisions_included || 2,
+          proposal.turnaround_days || 14,
+        ]
       );
-    }
 
-    return getProposalBySlug(proposal.slug) as Promise<Proposal>;
+      for (const item of items) {
+        const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        await pgPool.query(
+          `INSERT INTO line_items (id, proposal_id, description, quantity, unit_price, amount) VALUES ($1, $2, $3, $4, $5, $6)`,
+          [itemId, proposal.id, item.description, item.quantity, item.unit_price, item.amount]
+        );
+      }
+
+      const created = await getProposalBySlug(proposal.slug);
+      if (created) return created;
+    } catch (err: any) {
+      console.warn('[DB] PG createProposal failed, falling back:', err.message);
+    }
   }
 
   // Local fallback
@@ -252,36 +277,52 @@ export async function createProposal(
 
 export async function getCreatorById(id: string): Promise<Creator | null> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM creators WHERE id = $1`, [id]);
-    return (res.rows[0] as Creator) || null;
+    try {
+      const res = await pgPool.query(`SELECT * FROM creators WHERE id = $1`, [id]);
+      if (res.rows[0]) return res.rows[0] as Creator;
+    } catch (err: any) {
+      console.warn('[DB] PG getCreatorById failed, falling back:', err.message);
+    }
   }
   return localData.creators.find(c => c.id === id) || localData.creators[0] || null;
 }
 
 export async function getCreatorByEmail(email: string): Promise<Creator | null> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM creators WHERE email = $1`, [email]);
-    return (res.rows[0] as Creator) || null;
+    try {
+      const res = await pgPool.query(`SELECT * FROM creators WHERE email = $1`, [email]);
+      if (res.rows[0]) return res.rows[0] as Creator;
+    } catch (err: any) {
+      console.warn('[DB] PG getCreatorByEmail failed, falling back:', err.message);
+    }
   }
   return localData.creators.find(c => c.email.toLowerCase() === email.toLowerCase()) || null;
 }
 
 export async function getAllCreators(): Promise<Creator[]> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM creators ORDER BY created_at ASC`);
-    return res.rows as Creator[];
+    try {
+      const res = await pgPool.query(`SELECT * FROM creators ORDER BY created_at ASC`);
+      if (res.rows.length > 0) return res.rows as Creator[];
+    } catch (err: any) {
+      console.warn('[DB] PG getAllCreators failed, falling back:', err.message);
+    }
   }
   return [...localData.creators];
 }
 
 export async function createCreator(creator: Creator): Promise<Creator> {
   if (isPostgres && pgPool) {
-    await pgPool.query(
-      `INSERT INTO creators (id, name, email, password_hash, studio_name, currency, api_key, plan)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [creator.id, creator.name, creator.email, (creator as any).password_hash || '', creator.studio_name, creator.currency || 'USD', creator.api_key, creator.plan || 'Pro']
-    );
-    return creator;
+    try {
+      await pgPool.query(
+        `INSERT INTO creators (id, name, email, password_hash, studio_name, currency, api_key, plan)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [creator.id, creator.name, creator.email, (creator as any).password_hash || '', creator.studio_name, creator.currency || 'USD', creator.api_key, creator.plan || 'Pro']
+      );
+      return creator;
+    } catch (err: any) {
+      console.warn('[DB] PG createCreator failed, saving to local store:', err.message);
+    }
   }
   localData.creators.push(creator);
   saveLocalData();
@@ -290,16 +331,21 @@ export async function createCreator(creator: Creator): Promise<Creator> {
 
 export async function getProposalBySlug(slug: string): Promise<Proposal | null> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM proposals WHERE slug = $1`, [slug]);
-    if (!res.rows[0]) return null;
-    const prop = res.rows[0] as Proposal;
-    const client = await getClientById(prop.client_id);
-    const creator = await getCreatorById(prop.creator_id || 'cr_alex_rivera');
-    const itemsRes = await pgPool.query(`SELECT * FROM line_items WHERE proposal_id = $1`, [prop.id]);
-    prop.client = client || undefined;
-    prop.creator = creator || undefined;
-    prop.line_items = itemsRes.rows as LineItem[];
-    return prop;
+    try {
+      const res = await pgPool.query(`SELECT * FROM proposals WHERE slug = $1`, [slug]);
+      if (res.rows[0]) {
+        const prop = res.rows[0] as Proposal;
+        const client = await getClientById(prop.client_id);
+        const creator = await getCreatorById(prop.creator_id || 'cr_alex_rivera');
+        const itemsRes = await pgPool.query(`SELECT * FROM line_items WHERE proposal_id = $1`, [prop.id]);
+        prop.client = client || undefined;
+        prop.creator = creator || undefined;
+        prop.line_items = itemsRes.rows as LineItem[];
+        return prop;
+      }
+    } catch (err: any) {
+      console.warn('[DB] PG getProposalBySlug failed, falling back:', err.message);
+    }
   }
 
   const prop = localData.proposals.find(p => p.slug === slug);
@@ -317,20 +363,24 @@ export async function getProposalBySlug(slug: string): Promise<Proposal | null> 
 
 export async function getAllProposals(creator_id?: string): Promise<Proposal[]> {
   if (isPostgres && pgPool) {
-    let q = `SELECT * FROM proposals`;
-    let params: any[] = [];
-    if (creator_id) {
-      q += ` WHERE creator_id = $1`;
-      params.push(creator_id);
+    try {
+      let q = `SELECT * FROM proposals`;
+      let params: any[] = [];
+      if (creator_id) {
+        q += ` WHERE creator_id = $1`;
+        params.push(creator_id);
+      }
+      q += ` ORDER BY created_at DESC`;
+      const res = await pgPool.query(q, params);
+      const proposals: Proposal[] = [];
+      for (const p of res.rows) {
+        const full = await getProposalBySlug(p.slug);
+        if (full) proposals.push(full);
+      }
+      if (proposals.length > 0) return proposals;
+    } catch (err: any) {
+      console.warn('[DB] PG getAllProposals failed, falling back:', err.message);
     }
-    q += ` ORDER BY created_at DESC`;
-    const res = await pgPool.query(q, params);
-    const proposals: Proposal[] = [];
-    for (const p of res.rows) {
-      const full = await getProposalBySlug(p.slug);
-      if (full) proposals.push(full);
-    }
-    return proposals;
   }
 
   let list = localData.proposals;
@@ -348,24 +398,28 @@ export async function getAllProposals(creator_id?: string): Promise<Proposal[]> 
 
 export async function updateProposal(id: string, updates: Partial<Proposal>): Promise<Proposal | null> {
   if (isPostgres && pgPool) {
-    const fields: string[] = [];
-    const values: any[] = [];
-    let idx = 1;
-    for (const [key, val] of Object.entries(updates)) {
-      if (['title', 'body', 'status', 'total_amount', 'deposit_amount', 'deposit_paid', 'revisions_included', 'turnaround_days'].includes(key)) {
-        fields.push(`${key} = $${idx++}`);
-        values.push(val);
+    try {
+      const fields: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+      for (const [key, val] of Object.entries(updates)) {
+        if (['title', 'body', 'status', 'total_amount', 'deposit_amount', 'deposit_paid', 'revisions_included', 'turnaround_days'].includes(key)) {
+          fields.push(`${key} = $${idx++}`);
+          values.push(val);
+        }
       }
+      if (fields.length > 0) {
+        values.push(id);
+        await pgPool.query(
+          `UPDATE proposals SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`,
+          values
+        );
+      }
+      const res = await pgPool.query(`SELECT slug FROM proposals WHERE id = $1`, [id]);
+      if (res.rows[0]) return getProposalBySlug(res.rows[0].slug);
+    } catch (err: any) {
+      console.warn('[DB] PG updateProposal failed, falling back:', err.message);
     }
-    if (fields.length > 0) {
-      values.push(id);
-      await pgPool.query(
-        `UPDATE proposals SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${idx}`,
-        values
-      );
-    }
-    const res = await pgPool.query(`SELECT slug FROM proposals WHERE id = $1`, [id]);
-    return res.rows[0] ? getProposalBySlug(res.rows[0].slug) : null;
   }
 
   const index = localData.proposals.findIndex(p => p.id === id);
@@ -382,21 +436,25 @@ export async function updateProposal(id: string, updates: Partial<Proposal>): Pr
 // Invoice operations
 export async function createInvoice(invoice: Invoice): Promise<Invoice> {
   if (isPostgres && pgPool) {
-    await pgPool.query(
-      `INSERT INTO invoices (id, proposal_id, client_id, amount, due_date, status, stripe_checkout_session_id, stripe_payment_intent_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        invoice.id,
-        invoice.proposal_id || null,
-        invoice.client_id,
-        invoice.amount,
-        invoice.due_date || null,
-        invoice.status || 'UNPAID',
-        invoice.stripe_checkout_session_id || null,
-        invoice.stripe_payment_intent_id || null,
-      ]
-    );
-    return invoice;
+    try {
+      await pgPool.query(
+        `INSERT INTO invoices (id, proposal_id, client_id, amount, due_date, status, stripe_checkout_session_id, stripe_payment_intent_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          invoice.id,
+          invoice.proposal_id || null,
+          invoice.client_id,
+          invoice.amount,
+          invoice.due_date || null,
+          invoice.status || 'UNPAID',
+          invoice.stripe_checkout_session_id || null,
+          invoice.stripe_payment_intent_id || null,
+        ]
+      );
+      return invoice;
+    } catch (err: any) {
+      console.warn('[DB] PG createInvoice failed, falling back:', err.message);
+    }
   }
 
   localData.invoices.push(invoice);
@@ -406,13 +464,17 @@ export async function createInvoice(invoice: Invoice): Promise<Invoice> {
 
 export async function getAllInvoices(): Promise<Invoice[]> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
-    const invoices: Invoice[] = [];
-    for (const inv of res.rows) {
-      const client = await getClientById(inv.client_id);
-      invoices.push({ ...inv, client: client || undefined });
+    try {
+      const res = await pgPool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
+      const invoices: Invoice[] = [];
+      for (const inv of res.rows) {
+        const client = await getClientById(inv.client_id);
+        invoices.push({ ...inv, client: client || undefined });
+      }
+      if (invoices.length > 0) return invoices;
+    } catch (err: any) {
+      console.warn('[DB] PG getAllInvoices failed, falling back:', err.message);
     }
-    return invoices;
   }
 
   return localData.invoices.map(inv => ({

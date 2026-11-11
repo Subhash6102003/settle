@@ -111,8 +111,7 @@ async function startServer() {
 }
 
 startServer().catch(err => {
-  console.error('Fatal startup error:', err);
-  process.exit(1);
+  console.warn('[SERVER] Startup warning:', err);
 });
 
 export default app;
