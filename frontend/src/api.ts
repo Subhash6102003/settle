@@ -1,7 +1,6 @@
 export const API_BASE =
-  typeof window !== 'undefined' && !window.location.hostname.includes('localhost')
-    ? ''
-    : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.includes('localhost') ? 'http://localhost:5000' : '');
 
 export interface Creator {
   id: string;
