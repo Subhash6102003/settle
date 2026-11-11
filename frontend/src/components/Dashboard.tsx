@@ -1306,34 +1306,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
             {/* Profile Fields */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.75rem' }}>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                    Principal Name / Your Name
-                  </label>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Studio Entity</label>
+                <div style={{ position: 'relative' }}>
+                  <Building size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
                   <input
                     type="text"
-                    value={creatorProfile.name}
-                    onChange={e => setCreatorProfile({ ...creatorProfile, name: e.target.value })}
+                    value={creatorProfile.studioName}
+                    onChange={e => setCreatorProfile({ ...creatorProfile, studioName: e.target.value })}
                     className="input-clean"
-                    placeholder="e.g. Subhash Maurya"
+                    style={{ paddingLeft: '2rem' }}
                   />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
-                    Studio Brand / Entity
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <Building size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
-                    <input
-                      type="text"
-                      value={creatorProfile.studioName}
-                      onChange={e => setCreatorProfile({ ...creatorProfile, studioName: e.target.value })}
-                      className="input-clean"
-                      style={{ paddingLeft: '2rem' }}
-                      placeholder="e.g. Apex Creative Studio"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -1463,31 +1446,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
 
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', paddingTop: '1rem', marginTop: '1rem' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowProfileModal(false);
-                  onSignOut();
-                }}
-                className="btn-ghost"
-                style={{ color: '#e11d48', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.82rem' }}
-              >
-                <LogOut size={14} />
-                <span>Sign Out & Start Fresh</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button onClick={() => setShowProfileModal(false)} className="btn-ghost">
+                Close
               </button>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button onClick={() => setShowProfileModal(false)} className="btn-ghost">
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  className="btn-orange"
-                >
-                  Save Profile & Currency
-                </button>
-              </div>
+              <button
+                onClick={handleSaveProfile}
+                className="btn-orange"
+              >
+                Save Profile & Currency
+              </button>
             </div>
           </div>
         </div>

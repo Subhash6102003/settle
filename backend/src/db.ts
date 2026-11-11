@@ -177,6 +177,10 @@ export async function initDb(): Promise<void> {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        -- Ensure client extensions
+        ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone VARCHAR(64) DEFAULT '';
+        ALTER TABLE clients ADD COLUMN IF NOT EXISTS company VARCHAR(255) DEFAULT '';
+
         -- Ensure creator profile extensions
         ALTER TABLE creators ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
         ALTER TABLE creators ADD COLUMN IF NOT EXISTS phone VARCHAR(64) DEFAULT '';
@@ -205,8 +209,16 @@ export async function createClient(client: Client): Promise<Client> {
   if (isPostgres && pgPool) {
     try {
       await pgPool.query(
-        `INSERT INTO clients (id, name, email, currency) VALUES ($1, $2, $3, $4)`,
-        [client.id, client.name, client.email, client.currency || 'USD']
+        `INSERT INTO clients (id, creator_id, name, email, phone, company, currency) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          client.id,
+          client.creator_id || null,
+          client.name,
+          client.email,
+          client.phone || '',
+          client.company || '',
+          client.currency || 'INR',
+        ]
       );
       return client;
     } catch (err: any) {
