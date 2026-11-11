@@ -372,16 +372,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
           </nav>
 
           <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
-            Claude Protocol
+            Model Context Protocol (MCP)
           </div>
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <button onClick={() => setShowKeyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: '8px', color: '#475569', background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
               <Key size={17} color="#ff5c00" />
-              Claude MCP Token
+              MCP Protocol Token
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', color: '#10b981', fontSize: '0.82rem', fontWeight: 700 }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-              MCP Stdio Active
+              MCP Server Ready
             </div>
           </nav>
         </div>
@@ -999,7 +999,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Human In-the-Loop Override</h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Modify any deliverable, price, or revision clause Claude committed.</p>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Modify any deliverable, price, or revision clause before client sends.</p>
               </div>
               <button onClick={() => setEditingProposal(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
@@ -1254,8 +1254,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
           <div className="card-white" style={{ maxWidth: '520px', width: '100%', padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Claude MCP Protocol Key</h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Multi-tenant authentication token</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Model Context Protocol (MCP) Token</h3>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Universal multi-tenant agent authentication token</p>
               </div>
               <button onClick={() => setShowKeyModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
@@ -1273,8 +1273,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
               <code style={{ fontSize: '0.82rem', color: '#0f172a', background: '#ffffff', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block', wordBreak: 'break-all' }}>
                 {activeCreator.api_key}
               </code>
-              <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.4rem' }}>
-                Add this to your Claude Desktop config under <code>SETTLE_API_KEY</code> so all proposals link directly to your studio.
+              <p style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.4rem', lineHeight: 1.5 }}>
+                Compatible with any MCP-enabled assistant (Claude Desktop, ChatGPT, Cursor, Windsurf, or custom agent). Set <code>SETTLE_API_KEY</code> so all generated agreements link to your studio ledger.
               </p>
             </div>
 

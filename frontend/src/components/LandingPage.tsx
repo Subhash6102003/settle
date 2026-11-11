@@ -101,11 +101,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGoToApp, onViewDemoP
 
         <h1 style={{ fontSize: '2.85rem', fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, color: '#0f172a', marginBottom: '1.15rem' }}>
           Proposals, Invoices & Payment Receipts.<br />
-          <span style={{ color: '#ff5c00' }}>Controlled from Claude or Your Dashboard.</span>
+          <span style={{ color: '#ff5c00' }}>Autonomous via Any AI Agent (MCP) or Studio Console.</span>
         </h1>
 
         <p style={{ fontSize: '1.05rem', color: '#475569', maxWidth: '680px', margin: '0 auto 2rem', lineHeight: 1.6 }}>
-          Settle is a dedicated billing engine. It contains <strong>zero built-in AI</strong>. Connect your personal Claude Desktop plan via MCP to draft scopes automatically, or manage client agreements and Stripe deposits directly in the studio console.
+          Settle is an open commercial billing engine. Connect your preferred AI assistant—<strong>Claude, ChatGPT, Cursor, or any MCP-enabled agent</strong>—via the open Model Context Protocol to generate scopes and issue payment links, or manage client agreements and Stripe deposits directly in the studio console.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
@@ -123,7 +123,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGoToApp, onViewDemoP
       <section style={{ maxWidth: '1060px', margin: '2.5rem auto 4rem', padding: '0 1.5rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
           
-          {/* Workflow A: Claude MCP */}
+          {/* Workflow A: Any MCP Client */}
           <div className="card-white" style={{ padding: '2rem', border: '1px solid #fed7aa', background: '#fffaf5' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -131,14 +131,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGoToApp, onViewDemoP
               </div>
               <div>
                 <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>
-                  Workflow A: Autonomous via Claude (MCP)
+                  Workflow A: Autonomous via Any AI Agent (MCP)
                 </h3>
-                <span style={{ fontSize: '0.72rem', color: '#c2410c', fontWeight: 700 }}>Zero prompt engineering inside Settle</span>
+                <span style={{ fontSize: '0.72rem', color: '#c2410c', fontWeight: 700 }}>Open Model Context Protocol Standard</span>
               </div>
             </div>
 
             <p style={{ color: '#475569', fontSize: '0.88rem', lineHeight: 1.6, marginBottom: '1.25rem' }}>
-              Paste your client's brief or email into Claude Desktop. Claude calls Settle's tools via the Model Context Protocol to generate proposals, issue payment links, and pull financial summaries:
+              Connect your preferred assistant—whether <strong>Claude Desktop, ChatGPT, Cursor, or custom agents</strong>. Your assistant calls Settle's deterministic tools via MCP to turn raw client negotiation into live proposals and verified Stripe payment links:
             </p>
 
             <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem', color: '#334155', marginBottom: '1.25rem' }}>
@@ -465,7 +465,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onGoToApp, onViewDemoP
           Commercial Billing Engine for Independent Creators
         </h2>
         <p style={{ color: '#64748b', fontSize: '0.9rem', maxWidth: '580px', margin: '0 auto 1.5rem' }}>
-          Connect Claude via MCP or use the manual studio. Zero AI inside our backend, verified Stripe test payment rails.
+          Connect any AI agent via open MCP or manage scopes directly in the studio. Deterministic accounting engine with verified Stripe payment rails.
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.75rem' }}>
           <button onClick={onGoToApp} className="btn-orange" style={{ padding: '0.75rem 1.5rem' }}>
