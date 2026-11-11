@@ -1,4 +1,7 @@
-export const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
+export const API_BASE =
+  typeof window !== 'undefined' && !window.location.hostname.includes('localhost')
+    ? ''
+    : (import.meta.env.VITE_API_URL || 'http://localhost:5000');
 
 export interface Creator {
   id: string;
