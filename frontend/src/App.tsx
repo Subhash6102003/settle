@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { ProposalView } from './components/ProposalView';
+import { InvoiceReceiptView } from './components/InvoiceReceiptView';
 import { AuthScreen } from './components/AuthScreen';
 import { LandingPage } from './components/LandingPage';
 import { Creator, getActiveCreator } from './api';
@@ -42,6 +43,12 @@ export const App: React.FC = () => {
   if (currentPath.startsWith('/p/')) {
     const slug = currentPath.replace('/p/', '').split('/')[0].split('?')[0];
     return <ProposalView slug={slug} />;
+  }
+
+  // Route 1.5: Public Client Invoice & Receipt View (/invoices/:id or /receipt/:id)
+  if (currentPath.startsWith('/invoices/') || currentPath.startsWith('/receipt/')) {
+    const invoiceId = currentPath.replace(/^\/(invoices|receipt)\//, '').split('/')[0].split('?')[0];
+    return <InvoiceReceiptView invoiceId={invoiceId} />;
   }
 
   // Route 2: Landing Page (Default View)

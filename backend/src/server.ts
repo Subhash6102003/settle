@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import { initDb, getAllProposals, createClient, createProposal, getCreatorByApiKey } from './db';
+import { initDb, getAllProposals, createClient, createProposal, getCreatorByApiKey, getCreatorById } from './db';
 import clientsRouter from './routes/clients';
 import proposalsRouter from './routes/proposals';
 import invoicesRouter from './routes/invoices';
@@ -30,21 +30,33 @@ app.use(express.json());
 app.use(async (req: any, _res, next) => {
   try {
     const auth = req.headers.authorization;
-    const apiKey = (req.headers['x-api-key'] as string) || (auth && auth.startsWith('Bearer stl_live_') ? auth.replace('Bearer ', '').trim() : null);
+    const apiKey =
+      (req.headers['x-api-key'] as string) ||
+      (req.query.key as string) ||
+      (req.query.apiKey as string) ||
+      (req.query.api_key as string) ||
+      (auth && auth.startsWith('Bearer stl_live_') ? auth.replace('Bearer ', '').trim() : null);
+
     if (apiKey) {
       const creator = await getCreatorByApiKey(apiKey);
       if (creator) {
         req.creator = creator;
-        if (req.method === 'GET' && !req.query.creator_id) {
-          req.query.creator_id = creator.id;
-        }
-        if (['POST', 'PATCH', 'PUT'].includes(req.method) && req.body && typeof req.body === 'object' && !req.body.creator_id) {
+        req.query.creator_id = creator.id;
+        if (['POST', 'PATCH', 'PUT'].includes(req.method) && req.body && typeof req.body === 'object') {
           req.body.creator_id = creator.id;
         }
       }
     }
   } catch {}
   next();
+});
+
+// Self Profile Lookup endpoint
+app.get(['/api/auth/me', '/auth/me'], async (req: any, res) => {
+  if (req.creator) return res.json({ creator: req.creator });
+  const id = req.query.creator_id || 'cr_alex_rivera';
+  const c = await getCreatorById(id as string);
+  res.json({ creator: c });
 });
 
 // API Routes (mounted with and without /api prefix for universal proxy compatibility)

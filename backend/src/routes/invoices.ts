@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createInvoice, getAllInvoices, getClientById } from '../db';
+import { createInvoice, getAllInvoices, getClientById, getInvoiceById } from '../db';
 import { stripe } from '../stripe';
 import { nanoid } from 'nanoid';
 
@@ -61,9 +61,11 @@ router.post('/', async (req: Request, res: Response) => {
 
     const invoice = await createInvoice({
       id: invoiceId,
+      creator_id: (req as any).creator?.id || req.body.creator_id || client.creator_id,
       client_id,
       proposal_id: proposal_id || undefined,
       amount: Number(amount),
+      currency: currency || client.currency || 'INR',
       due_date: due_date || undefined,
       status: 'UNPAID',
       stripe_checkout_session_id: sessionId,
@@ -85,6 +87,18 @@ router.get('/', async (req: Request, res: Response) => {
     const creatorId = req.query.creator_id as string | undefined;
     const invoices = await getAllInvoices(creatorId);
     res.json({ invoices });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const invoice = await getInvoiceById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    res.json({ invoice });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

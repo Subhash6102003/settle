@@ -61,4 +61,6 @@ export interface Invoice {
   stripe_payment_intent_id?: string;
   created_at?: string;
   client?: Client;
+  creator?: Creator;
+  items?: any[];
 }

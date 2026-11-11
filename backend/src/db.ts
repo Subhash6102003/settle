@@ -166,6 +166,9 @@ export async function initDb(): Promise<void> {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        -- Backfill any invoices created without creator_id from their clients table
+        UPDATE invoices SET creator_id = clients.creator_id FROM clients WHERE invoices.client_id = clients.id AND (invoices.creator_id IS NULL OR invoices.creator_id = '');
+
         INSERT INTO creators (id, name, email, studio_name, currency, api_key, plan)
         VALUES 
           ('cr_alex_rivera', 'Alex Rivera', 'alex@apexcut.studio', 'Apex Cut Creative Studio', 'USD', 'stl_live_alex_9a82b1', 'Pro'),
@@ -494,10 +497,11 @@ export async function createInvoice(invoice: Invoice): Promise<Invoice> {
   if (isPostgres && pgPool) {
     try {
       await pgPool.query(
-        `INSERT INTO invoices (id, proposal_id, client_id, amount, due_date, status, stripe_checkout_session_id, stripe_payment_intent_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO invoices (id, creator_id, proposal_id, client_id, amount, due_date, status, stripe_checkout_session_id, stripe_payment_intent_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           invoice.id,
+          invoice.creator_id || null,
           invoice.proposal_id || null,
           invoice.client_id,
           invoice.amount,
@@ -518,16 +522,44 @@ export async function createInvoice(invoice: Invoice): Promise<Invoice> {
   return invoice;
 }
 
+export async function getInvoiceById(id: string): Promise<Invoice | null> {
+  if (isPostgres && pgPool) {
+    try {
+      const res = await pgPool.query(`SELECT * FROM invoices WHERE id = $1`, [id]);
+      if (res.rows[0]) {
+        const inv = res.rows[0] as Invoice;
+        const client = await getClientById(inv.client_id);
+        const creator = await getCreatorById(inv.creator_id || 'cr_alex_rivera');
+        return { ...inv, client: client || undefined, creator: creator || undefined };
+      }
+    } catch (err: any) {
+      console.warn('[DB] PG getInvoiceById failed, falling back:', err.message);
+    }
+  }
+
+  const invoice = localData.invoices.find(inv => inv.id === id);
+  if (!invoice) return null;
+
+  const client = localData.clients.find(c => c.id === invoice.client_id);
+  const creator = localData.creators.find(c => c.id === invoice.creator_id) || localData.creators[0];
+
+  return {
+    ...invoice,
+    client,
+    creator,
+  };
+}
+
 export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
   if (isPostgres && pgPool) {
     try {
-      let q = `SELECT * FROM invoices`;
+      let q = `SELECT i.* FROM invoices i LEFT JOIN clients c ON i.client_id = c.id`;
       const params: any[] = [];
       if (creator_id) {
-        q += ` WHERE creator_id = $1`;
+        q += ` WHERE (i.creator_id = $1 OR c.creator_id = $1)`;
         params.push(creator_id);
       }
-      q += ` ORDER BY created_at DESC`;
+      q += ` ORDER BY i.created_at DESC`;
       const res = await pgPool.query(q, params);
       const invoices: Invoice[] = [];
       for (const inv of res.rows) {
@@ -542,7 +574,11 @@ export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
 
   let list = localData.invoices;
   if (creator_id) {
-    list = list.filter(inv => inv.creator_id === creator_id);
+    list = list.filter(inv => {
+      if (inv.creator_id === creator_id) return true;
+      const c = localData.clients.find(cl => cl.id === inv.client_id);
+      return c && c.creator_id === creator_id;
+    });
   }
 
   return list.map(inv => ({

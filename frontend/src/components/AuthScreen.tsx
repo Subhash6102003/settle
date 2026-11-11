@@ -267,7 +267,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
 
         {/* Footer */}
         <div style={{ textAlign: 'center', marginTop: '1.75rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-          Volopay Tech Assignment • Zero AI Inside • Claude MCP Connected
+          Volopay Tech Assignment • Zero AI Inside • Universal MCP Connected (Claude, ChatGPT, Gemini, Cursor)
         </div>
 
       </div>

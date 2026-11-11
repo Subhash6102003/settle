@@ -32,7 +32,8 @@ import {
   Building,
   Globe,
   ChevronRight,
-  Award
+  Award,
+  Printer
 } from 'lucide-react';
 import gsap from 'gsap';
 
@@ -128,21 +129,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
 
   const gaugeRef = useRef<SVGCircleElement>(null);
 
+  const [showSampleReceiptModal, setShowSampleReceiptModal] = useState(false);
+
   const loadData = async () => {
     try {
       const cur = creator || getActiveCreator();
-      const [propsRes, statRes, invRes, clientRes, mcpRes] = await Promise.all([
-        fetch(`${API_BASE}/api/proposals?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ proposals: [] })),
-        fetch(`${API_BASE}/api/status?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ summary: null })),
-        fetch(`${API_BASE}/api/invoices?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ invoices: [] })),
-        fetch(`${API_BASE}/api/clients?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ clients: [] })),
-        fetch(`${API_BASE}/api/mcp/status?creator_id=${cur.id}`).then(r => r.json()).catch(() => ({ connected: false })),
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (cur.api_key) {
+        headers['x-api-key'] = cur.api_key;
+      }
+      const queryParam = cur.api_key
+        ? `api_key=${encodeURIComponent(cur.api_key)}&creator_id=${cur.id}`
+        : `creator_id=${cur.id}`;
+
+      const [meRes, propsRes, statRes, invRes, clientRes, mcpRes] = await Promise.all([
+        fetch(`${API_BASE}/api/auth/me?${queryParam}`, { headers }).then(r => r.json()).catch(() => null),
+        fetch(`${API_BASE}/api/proposals?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ proposals: [] })),
+        fetch(`${API_BASE}/api/status?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ summary: null })),
+        fetch(`${API_BASE}/api/invoices?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ invoices: [] })),
+        fetch(`${API_BASE}/api/clients?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ clients: [] })),
+        fetch(`${API_BASE}/api/mcp/status?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ connected: false })),
       ]);
 
-      setProposals(propsRes.proposals || []);
-      setSummary(statRes.summary || null);
-      setInvoices(invRes.invoices || []);
-      setClients(clientRes.clients || []);
+      if (meRes?.creator && meRes.creator.id && meRes.creator.id !== cur.id) {
+        const unified = {
+          ...cur,
+          id: meRes.creator.id,
+          studio_name: meRes.creator.studio_name || cur.studio_name,
+          currency: meRes.creator.currency || cur.currency,
+        };
+        setActiveCreator(unified);
+        setCreatorProfile(prev => ({
+          ...prev,
+          studioName: meRes.creator.studio_name || prev.studioName,
+          currency: meRes.creator.currency || prev.currency,
+        }));
+      }
+
+      setProposals(propsRes?.proposals || []);
+      setSummary(statRes?.summary || null);
+      setInvoices(invRes?.invoices || []);
+      setClients(clientRes?.clients || []);
       if (mcpRes && typeof mcpRes.connected === 'boolean') {
         setMcpStatus(prev => ({ ...prev, connected: mcpRes.connected, lastSeen: mcpRes.lastSeen || prev.lastSeen }));
       }
@@ -601,7 +630,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 marginTop: '0.25rem',
                 transition: 'all 150ms ease',
               }}
-              title={mcpStatus.connected ? 'MCP Server is connected to Claude' : 'MCP Server is standby • Click to connect'}
+              title={mcpStatus.connected ? 'MCP Server is connected to your AI Assistant' : 'MCP Server is standby • Click to connect'}
             >
               <div
                 style={{
@@ -828,7 +857,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                       {totalProposalsCount > 0 ? (
                         <>Conversion: {Math.round((acceptedProposals.length / totalProposalsCount) * 100)}% • Deposits: {summary?.collected_deposits > 0 ? 'Active' : 'Pending'} • SLA: Healthy</>
                       ) : (
-                        <>0 proposals logged • Create a proposal or connect Claude Desktop</>
+                        <>0 proposals logged • Create a proposal or connect an AI Assistant via MCP</>
                       )}
                     </div>
                   ) : (
@@ -841,7 +870,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
                   {totalProposalsCount > 0
                     ? '50% upfront deposit terms lock client production calendars 3.2x faster.'
-                    : 'Connect Claude Desktop via MCP or create a proposal to begin ledger telemetry.'}
+                    : 'Connect your AI Assistant (Claude, ChatGPT, Cursor, Gemini) via MCP or create a proposal to begin ledger telemetry.'}
                 </div>
               </div>
 
@@ -905,7 +934,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   Active Proposals & Scope Agreements
                 </h2>
                 <p style={{ color: '#64748b', fontSize: '0.85rem' }}>
-                  Committed by Claude over MCP. Click Edit to review or override terms in-place.
+                  Committed by your AI Assistant over MCP. Click Edit to review or override terms in-place.
                 </p>
               </div>
 
@@ -932,7 +961,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <FileText size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
                 <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>Welcome to {creatorProfile.studioName}</div>
                 <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '440px', margin: '0 auto 1.25rem' }}>
-                  No proposals logged yet for this studio. Connect Claude Desktop MCP using your Studio API Key, or create your first proposal directly.
+                  No proposals logged yet for this studio. Connect your AI Assistant (Claude, ChatGPT, Cursor) using your Studio MCP Key, or create your first proposal directly.
                 </p>
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
@@ -1020,20 +1049,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
         {/* View 3: INVOICES DIRECTORY */}
         {activeTab === 'invoices' && (
           <div className="card-white" style={{ padding: '1.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Issued Invoices & Payment Rail</h2>
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Direct Stripe payment links and automated reminders</p>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Issued Invoices & Executive Receipts</h2>
+                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Direct Stripe payment links, print-ready PDF receipts, and automated settlement tracking</p>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowSampleReceiptModal(true)}
+                className="btn-ghost"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', padding: '0.45rem 0.85rem', border: '1px solid #cbd5e1' }}
+              >
+                <Award size={15} color="#ff5c00" />
+                <span>Preview Sample Executive Receipt</span>
+              </button>
             </div>
 
             {invoices.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                 <DollarSign size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
                 <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Invoices Issued Yet</div>
-                <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto' }}>
-                  Ask Claude: "Create an invoice for $2,400 balance due upon delivery."
+                <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '420px', margin: '0 auto 1.25rem' }}>
+                  Ask your AI Assistant (Claude, ChatGPT, Gemini): "Create an invoice for ₹2,400 balance due upon delivery."
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setShowSampleReceiptModal(true)}
+                  className="btn-orange"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  <Award size={15} />
+                  <span>View Sample Executive Receipt</span>
+                </button>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -1045,35 +1092,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                       <th style={{ padding: '0.85rem 1rem' }}>Due Date</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Amount</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Status</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Action</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Official Receipt & Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {invoices.map((inv: any) => (
-                      <tr key={inv.id} style={{ borderBottom: '1px solid #f1f3f7' }}>
-                        <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>#{inv.id}</td>
-                        <td style={{ padding: '1rem', color: '#475569' }}>Partner #{inv.id.slice(-4).toUpperCase()}</td>
-                        <td style={{ padding: '1rem', color: '#64748b' }}>{inv.due_date || 'Due Upon Receipt'}</td>
-                        <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                          ${Number(inv.amount).toLocaleString()}
-                        </td>
-                        <td style={{ padding: '1rem' }}>
-                          <span className={`badge-status ${inv.status === 'PAID' ? 'badge-green' : 'badge-orange'}`}>
-                            {inv.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '1rem', textAlign: 'center' }}>
-                          <button
-                            onClick={() => handleSendReminder(inv.id)}
-                            className="btn-ghost"
-                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                          >
-                            <Send size={13} />
-                            Send Reminder
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {invoices.map((inv: any) => {
+                      const currencySymbol = getCurrencySymbol(inv.currency || creatorProfile.currency);
+                      return (
+                        <tr key={inv.id} style={{ borderBottom: '1px solid #f1f3f7' }}>
+                          <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                            #{inv.id}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#0f172a' }}>
+                            <div style={{ fontWeight: 700 }}>{inv.client?.name || `Partner #${inv.id.slice(-4).toUpperCase()}`}</div>
+                            {inv.client?.email && (
+                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{inv.client.email}</div>
+                            )}
+                          </td>
+                          <td style={{ padding: '1rem', color: '#64748b' }}>{inv.due_date || 'Due Upon Receipt'}</td>
+                          <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
+                            {currencySymbol}{Number(inv.amount).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '1rem' }}>
+                            <span className={`badge-status ${inv.status === 'PAID' ? 'badge-green' : 'badge-orange'}`}>
+                              {inv.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: '1rem', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                              <a
+                                href={`/invoices/${inv.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="btn-ghost"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}
+                                title="Open Executive Receipt"
+                              >
+                                <ExternalLink size={13} color="#ff5c00" />
+                                Receipt
+                              </a>
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/invoices/${inv.id}`;
+                                  navigator.clipboard.writeText(url);
+                                  setReminderToast('Receipt link copied!');
+                                  setTimeout(() => setReminderToast(null), 2000);
+                                }}
+                                className="btn-ghost"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                                title="Copy Public Receipt Link"
+                              >
+                                Copy Link
+                              </button>
+                              <button
+                                onClick={() => handleSendReminder(inv.id)}
+                                className="btn-ghost"
+                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                                title="Send Payment Reminder"
+                              >
+                                <Send size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1100,7 +1183,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <Users size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
                 <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Partners Registered</div>
                 <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto 1rem' }}>
-                  Register a commercial partner account here or let Claude add them automatically via MCP.
+                  Register a commercial partner account here or let your AI Assistant add them automatically via MCP.
                 </p>
                 <button onClick={() => setShowNewClientModal(true)} className="btn-orange">
                   + Add Partner
@@ -1120,9 +1203,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <tbody>
                     {clients.map((c: any) => (
                       <tr key={c.id} style={{ borderBottom: '1px solid #f1f3f7' }}>
-                        <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>Partner #{c.id.slice(-4).toUpperCase()}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>
+                          <div>{c.name || `Partner #${c.id.slice(-4).toUpperCase()}`}</div>
+                          {c.email && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{c.email}</div>}
+                        </td>
                         <td style={{ padding: '1rem', color: '#10b981', fontWeight: 600 }}>Active Production Account</td>
-                        <td style={{ padding: '1rem', fontWeight: 700, color: '#ff5c00' }}>{c.currency || 'USD'}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700, color: '#ff5c00' }}>{c.currency || 'INR'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.8rem' }}>{new Date(c.created_at || Date.now()).toLocaleDateString()}</td>
                       </tr>
                     ))}
@@ -1244,7 +1330,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
               {/* MCP Protocol Secret */}
               <div style={{ background: '#fff5f0', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,92,0,0.2)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>Claude MCP Secret Token</span>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>Universal Studio MCP Protocol Token</span>
                   <button onClick={copyApiKey} style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
                     {copiedKey ? 'Copied' : 'Copy Key'}
                   </button>
@@ -1569,8 +1655,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
           <div className="card-white" style={{ maxWidth: '640px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Connect Claude to Your Studio (MCP)</h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Zero AI inside Settle • Let external Claude manage your contracts & billing</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Connect AI Assistant to Your Studio (Universal MCP)</h3>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Zero AI inside Settle • External AI agents (Claude, ChatGPT, Gemini, Cursor) manage contracts & billing via open protocol</p>
               </div>
               <button onClick={() => setShowKeyModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
@@ -1596,7 +1682,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   transition: 'all 150ms ease',
                 }}
               >
-                🌐 Claude Browser (Web Connector)
+                🌐 Remote MCP (Web & Cloud Connectors)
               </button>
               <button
                 type="button"
@@ -1615,11 +1701,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   transition: 'all 150ms ease',
                 }}
               >
-                💻 Claude Desktop & Cursor (JSON)
+                💻 Local MCP Config (Claude Desktop, Cursor, IDEs)
               </button>
             </div>
 
-            {/* Tab 1: Claude Web Browser */}
+            {/* Tab 1: Remote MCP Web */}
             {mcpTab === 'browser' && (
               <div>
                 {/* Live Connection Heartbeat Banner */}
@@ -1627,7 +1713,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: mcpStatus.connected ? '#10b981' : '#f59e0b', boxShadow: `0 0 6px ${mcpStatus.connected ? '#10b981' : '#f59e0b'}` }} />
                     <span style={{ fontSize: '0.82rem', fontWeight: 700, color: mcpStatus.connected ? '#065f46' : '#92400e' }}>
-                      Status: {mcpStatus.connected ? 'MCP Server Active & Connected to Claude' : 'MCP Server Standby (Awaiting Connection)'}
+                      Status: {mcpStatus.connected ? 'MCP Server Active & Connected to AI Assistant' : 'MCP Server Standby (Awaiting Connection)'}
                     </span>
                   </div>
                   <button
@@ -1648,10 +1734,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
 
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
                   <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.3rem' }}>
-                    Connect to Claude.ai Browser (Custom Connector)
+                    Connect to Web AI Agents (Claude Browser, ChatGPT, Webhooks)
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1rem' }}>
-                    Paste your personal live endpoint into Claude.ai's <strong>Add custom connector</strong> dialog.
+                    Paste your personal live endpoint into your assistant's <strong>Add custom connector / MCP</strong> settings.
                   </p>
 
                   <div style={{ marginBottom: '1rem' }}>
@@ -1666,7 +1752,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <div style={{ marginBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>
-                        2. Recommended MCP URL (Streamable HTTP)
+                        2. Recommended Universal MCP URL (Streamable HTTP)
                       </span>
                       <button
                         type="button"
@@ -1681,7 +1767,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                       {browserMcpUrl}
                     </code>
                     <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.3rem' }}>
-                      ✨ Anthropic recommends Streamable HTTP to prevent the SSE deprecation warning.
+                      ✨ Streamable HTTP is the universal, modern transport for real-time tool calling without timeout warnings.
                     </p>
                   </div>
 
@@ -1709,22 +1795,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </div>
 
                 <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '0.9rem 1rem', fontSize: '0.78rem', color: '#1e40af', lineHeight: 1.5, marginBottom: '1.5rem' }}>
-                  <strong>How to connect in Claude.ai Browser:</strong><br />
-                  1. In Claude.ai, open left menu → <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add custom connector</strong>.<br />
-                  2. In <strong>Name:</strong> enter <code>Settle</code>.<br />
-                  3. In <strong>MCP server URL:</strong> paste the <strong>Recommended Streamable URL</strong> copied above.<br />
-                  4. Click <strong>Continue</strong>. Claude will instantly gain access to your Settle ledger!
+                  <strong>How to connect with your AI Assistant:</strong><br />
+                  1. <strong>Claude.ai Browser:</strong> Open left menu → <strong>Customize</strong> → <strong>Connectors</strong> → <strong>Add custom connector</strong> → Paste the Recommended Streamable URL.<br />
+                  2. <strong>ChatGPT / Custom GPTs:</strong> Use the standard MCP or OpenAPI connector and provide this URL.<br />
+                  3. <strong>Immediate Access:</strong> Your assistant can now create proposals, log clients, and issue payment links directly in your ledger!
                 </div>
               </div>
             )}
 
-            {/* Tab 2: Claude Desktop & Cursor JSON */}
+            {/* Tab 2: Desktop & Cursor JSON */}
             {mcpTab === 'desktop' && (
               <div>
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '1.25rem', marginBottom: '1.25rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
-                      claude_desktop_config.json
+                      mcp_config.json
                     </span>
                     <button
                       type="button"
@@ -1742,7 +1827,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
 
                 <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.85rem 1rem', fontSize: '0.76rem', color: '#64748b', lineHeight: 1.5, marginBottom: '1.5rem' }}>
                   <strong>Config File Locations:</strong><br />
-                  • <strong>Claude Desktop (Windows):</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code><br />
+                  • <strong>Claude Desktop:</strong> <code>%APPDATA%\Claude\claude_desktop_config.json</code><br />
                   • <strong>Cursor IDE:</strong> <code>.cursor/mcp.json</code> inside your project directory.
                 </div>
               </div>
@@ -1753,7 +1838,159 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 Your API Key: <code style={{ color: '#0f172a', fontWeight: 700 }}>{activeCreator.api_key}</code>
               </div>
               <button onClick={() => setShowKeyModal(false)} className="btn-orange" style={{ minWidth: '120px' }}>
-                Close
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 6: Sample Executive Invoice & Receipt Preview */}
+      {showSampleReceiptModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 70 }}>
+          <div className="card-white" style={{ maxWidth: '820px', width: '100%', maxHeight: '92vh', overflowY: 'auto', padding: '2.5rem', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ff5c00', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Official Sample Executive Receipt & Commercial Invoice
+                </span>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#0f172a', margin: '0.2rem 0' }}>
+                  REC-2026-RKM789 • {creatorProfile.studioName}
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>
+                  This is the exact high-converting executive receipt generated for your clients when an invoice is issued.
+                </p>
+              </div>
+              <button onClick={() => setShowSampleReceiptModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Receipt Preview Body */}
+            <div style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '2rem', background: '#ffffff', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
+              
+              {/* Header Badge & Settlement */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0f172a', paddingBottom: '1.5rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ff5c00', textTransform: 'uppercase' }}>
+                    Commercial Production Invoice
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0.25rem 0' }}>
+                    #inv_MvyB8taP
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Issued: Nov 12, 2026 • Net 14 Settlement Terms
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <span className="badge-status badge-green" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem', padding: '0.35rem 0.8rem' }}>
+                    <Check size={14} /> PAID IN FULL
+                  </span>
+                  <div className="tabular-nums" style={{ fontSize: '1.8rem', fontWeight: 800, color: '#0f172a', marginTop: '0.4rem' }}>
+                    {getCurrencySymbol(creatorProfile.currency || 'INR')}2,400.00
+                  </div>
+                </div>
+              </div>
+
+              {/* Billed Parties */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '8px', marginBottom: '1.75rem', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>Issued By</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                    {creatorProfile.studioName}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.2rem', lineHeight: 1.5 }}>
+                    Principal: {creatorProfile.name}<br />
+                    Settlement Rail: Stripe Connected Account<br />
+                    Currency: {creatorProfile.currency || 'INR'} ({getCurrencySymbol(creatorProfile.currency || 'INR')})
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700 }}>Commercial Partner (Client)</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+                    RKM Developments
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.2rem', lineHeight: 1.5 }}>
+                    Billing Contact: ap@acmebrand.com<br />
+                    Account: Commercial Production Retainer<br />
+                    Payment Reference: cs_sim_settle_verified
+                  </div>
+                </div>
+              </div>
+
+              {/* Itemized Deliverables */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1.5rem', fontSize: '0.88rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
+                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'left' }}>Deliverable / Service Description</th>
+                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'center' }}>Qty</th>
+                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>Rate</th>
+                    <th style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #f1f3f7' }}>
+                    <td style={{ padding: '0.85rem 0.5rem', color: '#0f172a', fontWeight: 600 }}>
+                      Hero Brand Commercial Video Post-Production (4K Master)
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 400 }}>DaVinci Resolve HDR color grading & master delivery</div>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'center', color: '#64748b' }}>1</td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'right', color: '#64748b' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}1,400</td>
+                    <td className="tabular-nums" style={{ padding: '0.85rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}1,400</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f1f3f7' }}>
+                    <td style={{ padding: '0.85rem 0.5rem', color: '#0f172a', fontWeight: 600 }}>
+                      Vertical Social Media Cutdowns (3 × 30s Deliverables)
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 400 }}>Optimized for 9:16 mobile ad campaigns</div>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'center', color: '#64748b' }}>1</td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'right', color: '#64748b' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}600</td>
+                    <td className="tabular-nums" style={{ padding: '0.85rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}600</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f1f3f7' }}>
+                    <td style={{ padding: '0.85rem 0.5rem', color: '#0f172a', fontWeight: 600 }}>
+                      Dolby Atmos Mastering & Commercial SFX Licensing
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: 400 }}>Broadcast clearance license included</div>
+                    </td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'center', color: '#64748b' }}>1</td>
+                    <td style={{ padding: '0.85rem 0.5rem', textAlign: 'right', color: '#64748b' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}400</td>
+                    <td className="tabular-nums" style={{ padding: '0.85rem 0.5rem', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}400</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Total Summary */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
+                <div style={{ width: '280px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    <span>Subtotal:</span>
+                    <span>{getCurrencySymbol(creatorProfile.currency || 'INR')}2,400.00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0', fontSize: '0.85rem', color: '#64748b' }}>
+                    <span>Production Tax (GST / VAT):</span>
+                    <span>{getCurrencySymbol(creatorProfile.currency || 'INR')}0.00</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.6rem 0', fontSize: '1.1rem', fontWeight: 800, color: '#0f172a', borderTop: '2px solid #0f172a', marginTop: '0.4rem' }}>
+                    <span>Total Amount Paid:</span>
+                    <span className="tabular-nums" style={{ color: '#ff5c00' }}>{getCurrencySymbol(creatorProfile.currency || 'INR')}2,400.00</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legal Settlement Note */}
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px', padding: '0.85rem 1rem', fontSize: '0.8rem', color: '#065f46', lineHeight: 1.5 }}>
+                <strong>✓ Settlement Verified:</strong> Payment processed via Stripe card authorization. All commercial IP rights and video deliverables are unlocked under Net 14 milestone terms.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+              <button onClick={() => window.print()} className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Printer size={15} /> Print / Export PDF
+              </button>
+              <button onClick={() => setShowSampleReceiptModal(false)} className="btn-orange">
+                Close Preview
               </button>
             </div>
           </div>

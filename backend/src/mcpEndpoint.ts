@@ -143,6 +143,29 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
     case 'create_proposal': {
       const propId = `prop_${nanoid(10)}`;
       const slug = a.title.toLowerCase().replace(/[^\w\s-]/g, '').trim().replace(/[\s_-]+/g, '-').slice(0, 30) + `-${nanoid(6)}`;
+      const currency = a.currency || creator.currency || 'INR';
+
+      // Auto-resolve or register client if AI passed name instead of ID
+      let resolvedClientId = a.client_id;
+      const existingClients = await getAllClients(creator.id);
+      let matchedClient = existingClients.find(c =>
+        c.id === a.client_id ||
+        c.name.toLowerCase().includes((a.client_id || '').toLowerCase()) ||
+        c.email.toLowerCase().includes((a.client_id || '').toLowerCase())
+      );
+
+      if (!matchedClient) {
+        const newClient = await createClient({
+          id: `cli_${nanoid(8)}`,
+          creator_id: creator.id,
+          name: a.client_name || a.client_id || 'Commercial Partner',
+          email: a.client_email || 'billing@partner.io',
+          currency,
+        });
+        resolvedClientId = newClient.id;
+      } else {
+        resolvedClientId = matchedClient.id;
+      }
       
       let total = 0;
       const formattedItems = (a.line_items || []).map((item: any) => {
@@ -160,14 +183,13 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
 
       const depositPct = Number(a.deposit_percentage) || 50;
       const depositAmount = Math.round((total * depositPct) / 100);
-      const currency = a.currency || creator.currency || 'INR';
 
       const proposal = await createProposal(
         {
           id: propId,
           slug,
           creator_id: creator.id,
-          client_id: a.client_id,
+          client_id: resolvedClientId,
           title: a.title,
           body: a.body,
           status: 'SENT',
@@ -187,18 +209,41 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
       return {
         content: [{
           type: 'text',
-          text: `Proposal created in your Settle ledger!\n\nTitle: ${proposal.title}\nPublic Link: ${publicUrl}\nTotal: ${currency} ${proposal.total_amount.toLocaleString()}\n50% Upfront Deposit: ${currency} ${proposal.deposit_amount.toLocaleString()}\nStatus: SENT\n\nThe client can open the link directly in their browser to review terms and pay the deposit via Stripe Checkout.`,
+          text: `Proposal created in your Settle ledger!\n\nTitle: ${proposal.title}\nPublic Executive Link: ${publicUrl}\nTotal: ${currency} ${proposal.total_amount.toLocaleString()}\n50% Upfront Deposit: ${currency} ${proposal.deposit_amount.toLocaleString()}\nStatus: SENT\n\nThe client can open the link directly in their browser to review executive scope terms and pay the deposit via Stripe.`,
         }],
       };
     }
 
     case 'create_invoice': {
       const invoiceId = `inv_${nanoid(8)}`;
-      const currency = creator.currency || 'INR';
+      const currency = a.currency || creator.currency || 'INR';
+
+      // Auto-resolve or register client if AI passed name instead of ID
+      let resolvedClientId = a.client_id;
+      const existingClients = await getAllClients(creator.id);
+      let matchedClient = existingClients.find(c =>
+        c.id === a.client_id ||
+        c.name.toLowerCase().includes((a.client_id || '').toLowerCase()) ||
+        c.email.toLowerCase().includes((a.client_id || '').toLowerCase())
+      );
+
+      if (!matchedClient) {
+        const newClient = await createClient({
+          id: `cli_${nanoid(8)}`,
+          creator_id: creator.id,
+          name: a.client_name || a.client_id || 'Commercial Partner',
+          email: a.client_email || 'billing@partner.io',
+          currency,
+        });
+        resolvedClientId = newClient.id;
+      } else {
+        resolvedClientId = matchedClient.id;
+      }
+
       const invoice = await createInvoice({
         id: invoiceId,
         creator_id: creator.id,
-        client_id: a.client_id,
+        client_id: resolvedClientId,
         amount: Number(a.amount),
         currency,
         status: 'UNPAID',
@@ -207,10 +252,13 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
         proposal_id: a.proposal_id || undefined,
       });
 
+      const frontendUrl = process.env.FRONTEND_URL || 'https://settle-blond.vercel.app';
+      const receiptUrl = `${frontendUrl}/invoices/${invoice.id}`;
+
       return {
         content: [{
           type: 'text',
-          text: `Invoice #${invoice.id} created!\n\nAmount: ${currency} ${invoice.amount.toLocaleString()}\nDue Date: ${invoice.due_date}\nStatus: UNPAID`,
+          text: `Invoice #${invoice.id} created in your Settle ledger!\n\nClient ID: ${resolvedClientId}\nAmount: ${currency} ${invoice.amount.toLocaleString()}\nDue Date: ${invoice.due_date}\nStatus: UNPAID\n\nPublic Executive Receipt & Stripe Payment Link: ${receiptUrl}\n\nClient can open this official receipt link to review payment terms and settle directly.`,
         }],
       };
     }
