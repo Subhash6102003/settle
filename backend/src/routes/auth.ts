@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { getAllCreators, createCreator, getCreatorByEmail, getCreatorById, updateCreator } from '../db';
+import { getAllCreators, createCreator, getCreatorByEmail, getCreatorById, updateCreator, resetDatabase } from '../db';
+import { sendCreatorOnboardingEmail, sendMcpConnectedEmail, getRecentEmails } from '../email';
 import { nanoid } from 'nanoid';
 
 const router = Router();
@@ -7,7 +8,7 @@ const router = Router();
 // Register new creator
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { name, email, password, studio_name, currency } = req.body;
+    const { name, email, password, studio_name, currency, description, phone, website, address, tax_id } = req.body;
 
     if (!name || !email || !password || !studio_name) {
       return res.status(400).json({ error: 'Name, email, password, and studio_name are required' });
@@ -27,10 +28,18 @@ router.post('/register', async (req: Request, res: Response) => {
       email,
       password_hash: password, // In production use bcrypt, plain for demo
       studio_name,
-      currency: currency || 'USD',
+      currency: currency || 'INR',
       api_key: apiKey,
       plan: 'Pro',
+      description: description || 'Commercial Production & Creative Direction',
+      phone: phone || '',
+      website: website || '',
+      address: address || '',
+      tax_id: tax_id || '',
     });
+
+    // Send Onboarding Email asynchronously
+    sendCreatorOnboardingEmail(newCreator).catch(err => console.warn('[EMAIL] Onboarding send failed:', err.message));
 
     res.status(201).json({
       success: true,
@@ -112,17 +121,24 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-// Update creator profile (including currency, studio name, name)
+// Update creator profile (including currency, studio name, name, description, contact)
 router.patch('/profile', async (req: Request, res: Response) => {
   try {
-    const { id, currency, studio_name, name } = req.body;
-    if (!id) {
+    const { id, currency, studio_name, name, email, description, phone, website, address, tax_id } = req.body;
+    const targetId = id || (req as any).creator?.id;
+    if (!targetId) {
       return res.status(400).json({ error: 'Creator ID is required' });
     }
-    const updated = await updateCreator(id, {
+    const updated = await updateCreator(targetId, {
       ...(currency ? { currency } : {}),
       ...(studio_name ? { studio_name } : {}),
       ...(name ? { name } : {}),
+      ...(email ? { email } : {}),
+      ...(description !== undefined ? { description } : {}),
+      ...(phone !== undefined ? { phone } : {}),
+      ...(website !== undefined ? { website } : {}),
+      ...(address !== undefined ? { address } : {}),
+      ...(tax_id !== undefined ? { tax_id } : {}),
     });
     if (!updated) {
       return res.status(404).json({ error: 'Creator not found' });
@@ -131,6 +147,45 @@ router.patch('/profile', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Reset database endpoint (keeps demo creators, clears all ephemeral test records)
+router.post('/reset-db', async (_req: Request, res: Response) => {
+  try {
+    const result = await resetDatabase();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trigger Onboarding Email manually
+router.post('/email/onboarding', async (req: Request, res: Response) => {
+  try {
+    const creator = (req as any).creator || (await getCreatorById(req.body.creator_id || 'cr_alex_rivera'));
+    if (!creator) return res.status(404).json({ error: 'Creator not found' });
+    const result = await sendCreatorOnboardingEmail(creator);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Trigger MCP Connected Email manually
+router.post('/email/mcp-connected', async (req: Request, res: Response) => {
+  try {
+    const creator = (req as any).creator || (await getCreatorById(req.body.creator_id || 'cr_alex_rivera'));
+    if (!creator) return res.status(404).json({ error: 'Creator not found' });
+    const result = await sendMcpConnectedEmail(creator, req.body.client_type || 'Claude / Universal MCP Agent');
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recent Emails preview
+router.get('/email/recent', (_req: Request, res: Response) => {
+  res.json({ emails: getRecentEmails() });
 });
 
 export default router;

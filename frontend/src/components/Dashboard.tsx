@@ -72,12 +72,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const [creatorProfile, setCreatorProfile] = useState({
     name: activeCreator.name || 'Studio Principal',
     email: activeCreator.email || 'studio@settle.io',
-    phone: '+1 (555) 382-9104',
+    phone: activeCreator.phone || '+1 (555) 382-9104',
     studioName: activeCreator.studio_name || 'Creative Studio',
-    currency: activeCreator.currency || 'USD',
+    currency: activeCreator.currency || 'INR',
+    description: activeCreator.description || 'Commercial Video Post-Production, 4K HDR Color Grading & Motion Design',
+    website: activeCreator.website || 'https://settle.studio',
+    address: activeCreator.address || '1088 Sansome St, Suite 400',
     stripeAccountId: `acct_${activeCreator.id ? activeCreator.id.replace('cr_', '') : '1UXxyL1WqmAv4Br6'}`,
     bankRouting: `${activeCreator.studio_name || 'Commercial'} Settlement Account`,
-    taxId: 'XX-XXX8921',
+    taxId: activeCreator.tax_id || 'US-EIN-84-2910492',
   });
 
   useEffect(() => {
@@ -87,8 +90,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
         ...prev,
         name: cur.name || prev.name,
         email: cur.email || prev.email,
+        phone: cur.phone || prev.phone,
         studioName: cur.studio_name || prev.studioName,
         currency: cur.currency || prev.currency,
+        description: cur.description !== undefined ? cur.description : prev.description,
+        website: cur.website || prev.website,
+        address: cur.address || prev.address,
+        taxId: cur.tax_id || prev.taxId,
         stripeAccountId: `acct_${cur.id ? cur.id.replace('cr_', '') : '1UXxyL1WqmAv4Br6'}`,
         bankRouting: `${cur.studio_name || 'Commercial'} Settlement Account`,
       }));
@@ -354,6 +362,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
           currency: creatorProfile.currency,
           studio_name: creatorProfile.studioName,
           name: creatorProfile.name,
+          email: creatorProfile.email,
+          phone: creatorProfile.phone,
+          description: creatorProfile.description,
+          website: creatorProfile.website,
+          address: creatorProfile.address,
+          tax_id: creatorProfile.taxId,
         }),
       });
       const data = await res.json();
@@ -364,16 +378,79 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
         currency: creatorProfile.currency,
         studio_name: creatorProfile.studioName,
         name: creatorProfile.name,
+        email: creatorProfile.email,
+        phone: creatorProfile.phone,
+        description: creatorProfile.description,
+        website: creatorProfile.website,
+        address: creatorProfile.address,
+        tax_id: creatorProfile.taxId,
       };
       setActiveCreator(updated);
       setNewCurrency(creatorProfile.currency);
       setClientCurrency(creatorProfile.currency);
       setShowProfileModal(false);
-      setReminderToast(`Studio primary currency switched to ${creatorProfile.currency} (${getCurrencySymbol(creatorProfile.currency)})`);
+      setReminderToast(`Studio profile & ${creatorProfile.currency} currency updated! Details will render on client receipts.`);
       setTimeout(() => setReminderToast(null), 3000);
       await loadData();
     } catch (err: any) {
       alert(err.message || 'Failed to save profile');
+    }
+  };
+
+  const handleSendOnboardingEmail = async () => {
+    try {
+      const cur = creator || getActiveCreator();
+      const res = await fetch(`${API_BASE}/api/auth/email/onboarding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creator_id: cur.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to trigger onboarding email');
+      setReminderToast(`Onboarding email sent to ${cur.email}! (SMTP Rail Active)`);
+      setTimeout(() => setReminderToast(null), 3500);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSendMcpEmail = async () => {
+    try {
+      const cur = creator || getActiveCreator();
+      const res = await fetch(`${API_BASE}/api/auth/email/mcp-connected`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ creator_id: cur.id, client_type: 'Claude / Universal MCP Agent' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to trigger MCP email');
+      setReminderToast(`MCP Connected email dispatched to ${cur.email}!`);
+      setTimeout(() => setReminderToast(null), 3500);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to clean up all data in the database?\n\nThis will remove all test scopes, proposals, clients, and invoices. Only clean demo studios will be preserved.'
+    );
+    if (!confirmed) return;
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE}/api/auth/reset-db`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to reset database');
+      setShowProfileModal(false);
+      setReminderToast('Database cleaned successfully! Starting fresh with demo records.');
+      setTimeout(() => setReminderToast(null), 3500);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message);
+      setLoading(false);
     }
   };
 
@@ -1257,6 +1334,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </div>
               </div>
 
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>
+                  Studio Capabilities & Bio (What We Do / Renders on Receipts & Invoices)
+                </label>
+                <textarea
+                  value={creatorProfile.description}
+                  onChange={e => setCreatorProfile({ ...creatorProfile, description: e.target.value })}
+                  className="input-clean"
+                  rows={2}
+                  placeholder="e.g. Commercial Video Post-Production, 4K HDR Color Grading & Motion Design"
+                  style={{ width: '100%', resize: 'vertical', fontSize: '0.82rem', lineHeight: 1.5 }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Studio Website</label>
+                  <div style={{ position: 'relative' }}>
+                    <Globe size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                    <input
+                      type="text"
+                      value={creatorProfile.website}
+                      onChange={e => setCreatorProfile({ ...creatorProfile, website: e.target.value })}
+                      className="input-clean"
+                      style={{ paddingLeft: '2rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Commercial Address</label>
+                  <input
+                    type="text"
+                    value={creatorProfile.address}
+                    onChange={e => setCreatorProfile({ ...creatorProfile, address: e.target.value })}
+                    className="input-clean"
+                    placeholder="Studio address for receipts"
+                  />
+                </div>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Email Address</label>
@@ -1338,6 +1456,66 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <code style={{ fontSize: '0.8rem', color: '#0f172a', background: '#fff', padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block' }}>
                   {activeCreator.api_key}
                 </code>
+              </div>
+
+              {/* Email & SMTP Notification Rail */}
+              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
+                    <Mail size={15} color="#ff5c00" />
+                    <span>Email & SMTP Notification Rail</span>
+                  </div>
+                  <span className="badge-status badge-green" style={{ fontSize: '0.72rem' }}>SMTP Rail Ready</span>
+                </div>
+                <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '0 0 0.75rem', lineHeight: 1.4 }}>
+                  Dispatches onboarding badges and real-time MCP connection alerts to your inbox:
+                </p>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={handleSendOnboardingEmail}
+                    className="btn-ghost"
+                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.7rem', border: '1px solid #cbd5e1' }}
+                  >
+                    Send Onboarding Email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendMcpEmail}
+                    className="btn-ghost"
+                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.7rem', border: '1px solid #cbd5e1' }}
+                  >
+                    Send MCP Connected Email
+                  </button>
+                </div>
+              </div>
+
+              {/* Clean Slate Database Reset */}
+              <div style={{ background: '#fff1f2', padding: '1rem', borderRadius: '10px', border: '1px solid #fecdd3' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>
+                    Database Clean Slate (PostgreSQL Reset)
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#9f1239', margin: '0 0 0.6rem', lineHeight: 1.4 }}>
+                  Wipe all test scopes, proposals, clients, and ephemeral data. Clean demo accounts will be preserved.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResetDatabase}
+                  style={{
+                    background: '#e11d48',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.4rem 0.85rem',
+                    fontSize: '0.76rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset Database to Clean Demo State
+                </button>
               </div>
 
             </div>

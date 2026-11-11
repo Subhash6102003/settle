@@ -29,6 +29,11 @@ const DEFAULT_CREATORS: Creator[] = [
     currency: 'USD',
     api_key: 'stl_live_alex_9a82b1',
     plan: 'Pro',
+    description: 'High-end commercial video post-production, 4K HDR color mastering, and broadcast motion design.',
+    phone: '+1 (555) 382-9104',
+    website: 'https://apexcut.studio',
+    address: '1088 Sansome St, Suite 400, San Francisco, CA 94111',
+    tax_id: 'US-EIN-84-2910492',
   },
   {
     id: 'cr_elena_vance',
@@ -38,6 +43,11 @@ const DEFAULT_CREATORS: Creator[] = [
     currency: 'USD',
     api_key: 'stl_live_elena_7c34d9',
     plan: 'Pro',
+    description: 'Boutique cinematic visual effects, sound design, and 3D product animation.',
+    phone: '+1 (555) 749-2041',
+    website: 'https://vancefilms.io',
+    address: '420 W 14th St, New York, NY 10014',
+    tax_id: 'US-EIN-13-9481023',
   },
 ];
 
@@ -166,6 +176,13 @@ export async function initDb(): Promise<void> {
           stripe_payment_intent_id VARCHAR(255),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
+
+        -- Ensure creator profile extensions
+        ALTER TABLE creators ADD COLUMN IF NOT EXISTS description TEXT DEFAULT '';
+        ALTER TABLE creators ADD COLUMN IF NOT EXISTS phone VARCHAR(64) DEFAULT '';
+        ALTER TABLE creators ADD COLUMN IF NOT EXISTS website VARCHAR(255) DEFAULT '';
+        ALTER TABLE creators ADD COLUMN IF NOT EXISTS address TEXT DEFAULT '';
+        ALTER TABLE creators ADD COLUMN IF NOT EXISTS tax_id VARCHAR(64) DEFAULT '';
 
         -- Backfill any invoices created without creator_id from their clients table
         UPDATE invoices SET creator_id = clients.creator_id FROM clients WHERE invoices.client_id = clients.id AND (invoices.creator_id IS NULL OR invoices.creator_id = '');
@@ -352,7 +369,7 @@ export async function updateCreator(id: string, updates: Partial<Creator>): Prom
       const values: any[] = [];
       let idx = 1;
       for (const [key, val] of Object.entries(updates)) {
-        if (['name', 'email', 'studio_name', 'currency', 'plan'].includes(key)) {
+        if (['name', 'email', 'studio_name', 'currency', 'plan', 'description', 'phone', 'website', 'address', 'tax_id'].includes(key)) {
           fields.push(`${key} = $${idx++}`);
           values.push(val);
         }
@@ -375,6 +392,50 @@ export async function updateCreator(id: string, updates: Partial<Creator>): Prom
   };
   saveLocalData();
   return localData.creators[index];
+}
+
+export async function resetDatabase(): Promise<{ success: boolean; message: string }> {
+  if (isPostgres && pgPool) {
+    try {
+      await pgPool.query(`
+        DELETE FROM line_items;
+        DELETE FROM invoices;
+        DELETE FROM proposals;
+        DELETE FROM clients;
+        DELETE FROM creators WHERE id NOT IN ('cr_alex_rivera', 'cr_elena_vance');
+      `);
+      // Restore default demo creators if missing
+      for (const c of DEFAULT_CREATORS) {
+        await pgPool.query(
+          `INSERT INTO creators (id, name, email, studio_name, currency, api_key, plan, description, phone, website, address, tax_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           ON CONFLICT (id) DO UPDATE SET
+             name = EXCLUDED.name,
+             studio_name = EXCLUDED.studio_name,
+             currency = EXCLUDED.currency,
+             description = EXCLUDED.description,
+             phone = EXCLUDED.phone,
+             website = EXCLUDED.website,
+             address = EXCLUDED.address,
+             tax_id = EXCLUDED.tax_id`,
+          [c.id, c.name, c.email, c.studio_name, c.currency, c.api_key, c.plan, c.description || '', c.phone || '', c.website || '', c.address || '', c.tax_id || '']
+        );
+      }
+    } catch (err: any) {
+      console.warn('[DB] PG resetDatabase failed:', err.message);
+    }
+  }
+
+  localData = {
+    creators: [...DEFAULT_CREATORS],
+    clients: [],
+    proposals: [],
+    line_items: [],
+    invoices: [],
+  };
+  saveLocalData();
+
+  return { success: true, message: 'Database reset successfully. Only demo creators preserved.' };
 }
 
 export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null> {
@@ -563,7 +624,7 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
       if (res.rows[0]) {
         const inv = res.rows[0] as Invoice;
         const client = await getClientById(inv.client_id);
-        const creator = await getCreatorById(inv.creator_id || 'cr_alex_rivera');
+        const creator = await getCreatorById(inv.creator_id || client?.creator_id || 'cr_alex_rivera');
         return { ...inv, client: client || undefined, creator: creator || undefined };
       }
     } catch (err: any) {

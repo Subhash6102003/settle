@@ -31,8 +31,14 @@ interface InvoiceData {
   creator?: {
     id: string;
     name: string;
+    email?: string;
     studio_name: string;
     currency: string;
+    description?: string;
+    phone?: string;
+    website?: string;
+    address?: string;
+    tax_id?: string;
   };
 }
 
@@ -170,31 +176,47 @@ export const InvoiceReceiptView: React.FC<InvoiceReceiptViewProps> = ({ invoiceI
           </div>
 
           {/* Party Details */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '2.5rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginBottom: '1.75rem', background: '#f8fafc', padding: '1.5rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <div>
               <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>Issued By</span>
               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>
-                {invoice.creator?.studio_name || 'Apex Creative Studio'}
+                {invoice.creator?.studio_name || 'Creative Studio'}
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.25rem', lineHeight: 1.5 }}>
                 Principal: {invoice.creator?.name || 'Studio Principal'}<br />
-                Settlement Currency: <strong>{currencyCode} ({sym})</strong><br />
-                Platform: Multi-Tenant Ledger (Connected to Stripe)
+                {invoice.creator?.phone && <>Phone: {invoice.creator.phone}<br /></>}
+                {invoice.creator?.email && <>Email: {invoice.creator.email}<br /></>}
+                {invoice.creator?.address && <>Address: {invoice.creator.address}<br /></>}
+                {invoice.creator?.tax_id && <>Tax ID / EIN: <strong>{invoice.creator.tax_id}</strong><br /></>}
+                Settlement Currency: <strong>{currencyCode} ({sym})</strong>
               </div>
             </div>
 
             <div>
-              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>Billed To</span>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>Billed To (Commercial Partner)</span>
               <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a', marginTop: '0.25rem' }}>
                 {invoice.client?.name || 'Commercial Client'}
               </div>
-              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.2rem' }}>
+              <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.25rem', lineHeight: 1.5 }}>
                 Billing Email: {invoice.client?.email || 'billing@client.com'}<br />
                 Client Account ID: #{invoice.client_id.slice(-6).toUpperCase()}<br />
-                Payment Terms: Net 14 / Immediate Mobilization
+                Payment Terms: Net 14 Milestone Settlement<br />
+                Payment Rail: Stripe Verified Card Authorization
               </div>
             </div>
           </div>
+
+          {/* Studio Profile & Commercial Specialization */}
+          {invoice.creator?.description && (
+            <div style={{ marginBottom: '2rem', padding: '1.25rem 1.5rem', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+              <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#ff5c00', fontWeight: 800, letterSpacing: '0.05em' }}>
+                Studio Scope & Creative Capabilities
+              </span>
+              <p style={{ fontSize: '0.86rem', color: '#334155', lineHeight: 1.6, margin: '0.4rem 0 0' }}>
+                {invoice.creator.description}
+              </p>
+            </div>
+          )}
 
           {/* Itemized Line Items Table */}
           <div style={{ marginBottom: '2.5rem' }}>

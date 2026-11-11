@@ -13,6 +13,11 @@ export interface Creator {
   currency: string;
   api_key: string;
   plan: 'Free' | 'Pro';
+  description?: string;
+  phone?: string;
+  website?: string;
+  address?: string;
+  tax_id?: string;
 }
 
 export interface Client {

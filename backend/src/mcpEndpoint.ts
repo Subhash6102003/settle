@@ -16,13 +16,16 @@ import {
   getCreatorByApiKey,
   getCreatorById,
   createCreator,
+  updateCreator,
 } from './db';
 import { Creator } from './types';
 import { nanoid } from 'nanoid';
+import { sendMcpConnectedEmail, sendInvoiceReceiptEmail } from './email';
 
-// Keep track of active transports and connection heartbeat
+// Keep track of active transports, connection heartbeat, and notification state
 const activeTransports = new Map<string, { transport: SSEServerTransport; creator: Creator }>();
 const creatorMcpActivity = new Map<string, { lastSeen: Date; client: string }>();
+const notifiedMcpCreators = new Set<string>();
 
 const TOOLS: Tool[] = [
   {
@@ -117,6 +120,29 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {},
+    },
+  },
+  {
+    name: 'get_studio_profile',
+    description: 'Retrieve current creator studio business profile, bio/description, creative capabilities, settlement currency, and business contact information.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'update_studio_profile',
+    description: 'Update creator studio business profile, description (what we do / services offered), phone, website, address, or tax ID so it appears on official invoices and client receipts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        studio_name: { type: 'string', description: 'Studio or agency business name' },
+        description: { type: 'string', description: 'What we do: studio description, creative capabilities, equipment, and specialization' },
+        phone: { type: 'string', description: 'Business phone contact' },
+        website: { type: 'string', description: 'Studio portfolio or official website' },
+        address: { type: 'string', description: 'Physical or business address' },
+        tax_id: { type: 'string', description: 'Business tax registration, GSTIN, or EIN number' },
+      },
     },
   },
 ];
@@ -255,10 +281,23 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
       const frontendUrl = process.env.FRONTEND_URL || 'https://settle-blond.vercel.app';
       const receiptUrl = `${frontendUrl}/invoices/${invoice.id}`;
 
+      // Dispatch client email notification with receipt link
+      sendInvoiceReceiptEmail(
+        invoice,
+        matchedClient || { name: a.client_name || a.client_id, email: a.client_email || 'billing@partner.com' },
+        creator,
+        receiptUrl
+      ).catch(err => console.warn('[EMAIL] Invoice receipt dispatch error:', err.message));
+
+      let profileGuidance = '';
+      if (!creator.description) {
+        profileGuidance = `\n\nTip: You can ask the creator for their studio bio/description and services using update_studio_profile so it renders permanently on their executive receipts.`;
+      }
+
       return {
         content: [{
           type: 'text',
-          text: `Invoice #${invoice.id} created in your Settle ledger!\n\nClient ID: ${resolvedClientId}\nAmount: ${currency} ${invoice.amount.toLocaleString()}\nDue Date: ${invoice.due_date}\nStatus: UNPAID\n\nPublic Executive Receipt & Stripe Payment Link: ${receiptUrl}\n\nClient can open this official receipt link to review payment terms and settle directly.`,
+          text: `Invoice #${invoice.id} created in your Settle ledger!\n\nClient: ${matchedClient?.name || a.client_name || a.client_id} (${resolvedClientId})\nAmount: ${currency} ${invoice.amount.toLocaleString()}\nDue Date: ${invoice.due_date}\nStatus: UNPAID\n\nPublic Executive Receipt & Stripe Payment Link: ${receiptUrl}\n\nClient can open this official receipt link to review payment terms and settle directly.${profileGuidance}`,
         }],
       };
     }
@@ -295,6 +334,32 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
         content: [{
           type: 'text',
           text: `=== Studio Ledger Summary for ${creator.studio_name} ===\nSettlement Currency: ${creator.currency}\nTotal Commercial Partners: ${clients.length}\nActive Proposals: ${proposals.length} (Total Pipeline: ${creator.currency} ${totalPipeline.toLocaleString()})\nDeposits Cleared: ${creator.currency} ${depositCleared.toLocaleString()}\nOutstanding Invoices: ${invoices.filter(i => i.status === 'UNPAID').length}`,
+        }],
+      };
+    }
+
+    case 'get_studio_profile': {
+      return {
+        content: [{
+          type: 'text',
+          text: `=== Commercial Studio Profile ===\nStudio Name: ${creator.studio_name}\nPrincipal: ${creator.name}\nEmail: ${creator.email}\nPhone: ${creator.phone || 'Not set'}\nWebsite: ${creator.website || 'Not set'}\nAddress: ${creator.address || 'Not set'}\nTax/EIN ID: ${creator.tax_id || 'Not set'}\nCurrency: ${creator.currency}\nDescription / What We Do: ${creator.description || 'Not set'}\n\nAll these details appear automatically on your official invoices and executive receipts.`,
+        }],
+      };
+    }
+
+    case 'update_studio_profile': {
+      const updated = await updateCreator(creator.id, {
+        ...(a.studio_name ? { studio_name: a.studio_name } : {}),
+        ...(a.description ? { description: a.description } : {}),
+        ...(a.phone ? { phone: a.phone } : {}),
+        ...(a.website ? { website: a.website } : {}),
+        ...(a.address ? { address: a.address } : {}),
+        ...(a.tax_id ? { tax_id: a.tax_id } : {}),
+      });
+      return {
+        content: [{
+          type: 'text',
+          text: `Studio profile updated successfully! These details will now appear on all official client receipts and milestone agreements.\n\nStudio Name: ${updated?.studio_name || creator.studio_name}\nDescription: ${updated?.description || a.description || 'Updated'}\nAddress: ${updated?.address || a.address || 'Updated'}\nPhone: ${updated?.phone || a.phone || 'Updated'}`,
         }],
       };
     }
@@ -404,8 +469,14 @@ export function setupMcpRoutes(app: Express) {
     // Record activity
     creatorMcpActivity.set(creator.id, {
       lastSeen: new Date(),
-      client: req.headers['user-agent'] || 'Claude',
+      client: req.headers['user-agent'] || 'Claude / Universal MCP Agent',
     });
+
+    if (!notifiedMcpCreators.has(creator.id)) {
+      notifiedMcpCreators.add(creator.id);
+      sendMcpConnectedEmail(creator, (req.headers['user-agent'] as string) || 'Claude / Universal MCP Agent')
+        .catch(err => console.warn('[EMAIL] MCP connected send error:', err.message));
+    }
 
     // 1. Handle HTTP GET request
     if (req.method === 'GET') {
