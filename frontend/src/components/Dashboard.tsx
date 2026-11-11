@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Proposal,
   fetchProposals,
@@ -25,16 +25,24 @@ import {
   Plus,
   Send,
   LogOut,
-  UserPlus
+  UserPlus,
+  CreditCard,
+  Phone,
+  Mail,
+  Building,
+  Globe,
+  ChevronRight
 } from 'lucide-react';
+import gsap from 'gsap';
 
 interface DashboardProps {
   onSignOut: () => void;
+  onOpenLanding: () => void;
 }
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'proposals' | 'invoices' | 'clients'>('dashboard');
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -49,8 +57,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
   const [showNewProposalModal, setShowNewProposalModal] = useState(false);
   const [showNewClientModal, setShowNewClientModal] = useState(false);
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
   const [reminderToast, setReminderToast] = useState<string | null>(null);
+
+  // Active hover states for charts
+  const [hoveredMonth, setHoveredMonth] = useState<any | null>(null);
+  const [hoveredGauge, setHoveredGauge] = useState(false);
+
+  // Creator profile state (Alex Rivera)
+  const [creatorProfile, setCreatorProfile] = useState({
+    name: 'Alex Rivera',
+    email: 'alex@apexcut.studio',
+    phone: '+1 (555) 382-9104',
+    studioName: 'Apex Cut Creative Studio',
+    currency: 'USD',
+    stripeAccountId: 'acct_1UXxyL1WqmAv4Br6',
+    bankRouting: 'Chase Bank (•••• 4912)',
+    taxId: 'XX-XXX8921',
+  });
 
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
@@ -72,6 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
   const [clientEmail, setClientEmail] = useState('');
 
   const activeCreator: Creator = getActiveCreator();
+  const gaugeRef = useRef<SVGCircleElement>(null);
 
   const loadData = async () => {
     try {
@@ -98,6 +124,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
     const interval = setInterval(loadData, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  // GSAP Gauge Animation on load
+  useEffect(() => {
+    if (gaugeRef.current) {
+      gsap.fromTo(
+        gaugeRef.current,
+        { strokeDashoffset: 440 },
+        { strokeDashoffset: 440 - (440 * 0.88 * 0.5), duration: 1.2, ease: 'power2.out' }
+      );
+    }
+  }, [loading]);
 
   const handleOpenEdit = (p: Proposal) => {
     setEditingProposal(p);
@@ -135,12 +172,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: newClientId || clients[0]?.id || 'cli_acme_demo',
+          client_id: newClientId || clients[0]?.id || 'cli_partner_1042',
           creator_id: activeCreator.id,
           title: newTitle,
           body: newBody,
           line_items: [
-            { description: 'Primary Video Production Deliverable Cut', quantity: 1, unit_price: Number(newTotal), amount: Number(newTotal) },
+            { description: 'Primary Commercial Production Deliverable', quantity: 1, unit_price: Number(newTotal), amount: Number(newTotal) },
           ],
           turnaround_days: Number(newTurnaround),
           revisions_included: Number(newRevisions),
@@ -195,13 +232,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
     }
   };
 
-  // Export CSV feature
   const handleExportCSV = () => {
-    const headers = ['ID', 'Title', 'Client', 'Status', 'Total', 'Deposit', 'Created At'];
+    const headers = ['ID', 'Scope Title', 'Client Ref', 'Status', 'Total ($)', '50% Deposit ($)', 'Created At'];
     const rows = proposals.map(p => [
       p.id,
       `"${p.title.replace(/"/g, '""')}"`,
-      `"${p.client?.name || ''}"`,
+      `"Commercial Partner #${p.id.slice(-4)}"`,
       p.status,
       p.total_amount,
       p.deposit_amount,
@@ -212,7 +248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `settle-ledger-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `settle-commercial-ledger-${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -224,20 +260,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
-  // Filtered proposals
+  // Anonymized proposals (zero raw client names exposed on UI)
   const filteredProposals = proposals.filter(p => {
-    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.client?.name || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
     if (statusFilter === 'ALL') return matchesSearch;
     if (statusFilter === 'PAID') return matchesSearch && (p.deposit_paid === 1 || p.status === 'ACCEPTED');
     if (statusFilter === 'PENDING') return matchesSearch && !p.deposit_paid && p.status !== 'ACCEPTED';
     return matchesSearch;
   });
 
+  const monthlyBars = [
+    { m: 'Jan', h: 45, rev: '$4,200', conv: '8.2%', a: false },
+    { m: 'Feb', h: 60, rev: '$6,800', conv: '9.4%', a: false },
+    { m: 'Mar', h: 35, rev: '$3,500', conv: '7.1%', a: false },
+    { m: 'Apr', h: 80, rev: '$12,400', conv: '11.0%', a: false },
+    { m: 'May', h: 65, rev: '$8,900', conv: '10.2%', a: false },
+    { m: 'Jun', h: 110, rev: '$24,064', conv: '12.5%', a: true }, // Current month
+    { m: 'Jul', h: 50, rev: '$5,800', conv: '8.8%', a: false },
+    { m: 'Aug', h: 40, rev: '$4,100', conv: '7.9%', a: false },
+    { m: 'Sep', h: 75, rev: '$9,800', conv: '10.5%', a: false },
+    { m: 'Oct', h: 60, rev: '$7,200', conv: '9.1%', a: false },
+    { m: 'Nov', h: 85, rev: '$14,200', conv: '11.8%', a: false },
+    { m: 'Dec', h: 95, rev: '$16,500', conv: '12.2%', a: false },
+  ];
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f7f8fa' }}>
       
-      {/* Toast Notification */}
+      {/* Toast Alert */}
       {reminderToast && (
         <div style={{ position: 'fixed', top: '20px', right: '20px', background: '#0f172a', color: '#fff', padding: '0.85rem 1.25rem', borderRadius: '10px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', display: 'flex', alignItems: 'center', gap: '0.6rem', zIndex: 100, fontSize: '0.88rem' }}>
           <Check size={16} color="#ff5c00" />
@@ -255,7 +305,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {activeCreator.studio_name}
+                {creatorProfile.studioName}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                 <span style={{ fontSize: '0.75rem', color: '#ff5c00', fontWeight: 700 }}>Pro Studio</span>
@@ -270,14 +320,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
             <Search size={14} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
             <input
               type="text"
-              placeholder="Search (⌘K)"
+              placeholder="Search scopes (⌘K)"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ width: '100%', padding: '0.5rem 0.5rem 0.5rem 2rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '0.8rem', outline: 'none' }}
             />
           </div>
 
-          {/* Main Menu Links (Every Button Working) */}
+          {/* Main Menu Links */}
           <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
             Main Menu
           </div>
@@ -314,7 +364,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
               style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: '8px', background: activeTab === 'clients' ? '#fff5f0' : 'transparent', color: activeTab === 'clients' ? '#ff5c00' : '#475569', fontWeight: activeTab === 'clients' ? 700 : 500, fontSize: '0.88rem', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', borderLeft: activeTab === 'clients' ? '3px solid #ff5c00' : 'none' }}
             >
               <Users size={17} />
-              Clients
+              Commercial Partners
               <span style={{ marginLeft: 'auto', background: '#f1f3f7', color: '#64748b', fontSize: '0.7rem', padding: '0.15rem 0.45rem', borderRadius: '10px', fontWeight: 700 }}>
                 {clients.length}
               </span>
@@ -327,7 +377,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
             <button onClick={() => setShowKeyModal(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', borderRadius: '8px', color: '#475569', background: 'none', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', fontSize: '0.88rem', fontWeight: 500 }}>
               <Key size={17} color="#ff5c00" />
-              Claude Secret Token
+              Claude MCP Token
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.85rem', color: '#10b981', fontSize: '0.82rem', fontWeight: 700 }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
@@ -336,19 +386,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
           </nav>
         </div>
 
-        {/* User Account & Sign Out */}
+        {/* User Profile Button in Side Panel (Clickable to view Profile & Payout details) */}
         <div style={{ paddingTop: '1rem', borderTop: '1px solid #f1f3f7' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem', background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '0.75rem' }}>
+          <button
+            onClick={() => setShowProfileModal(true)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 0.75rem',
+              background: '#f8fafc',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              cursor: 'pointer',
+              marginBottom: '0.75rem',
+              textAlign: 'left',
+              transition: 'all 150ms ease',
+            }}
+            title="Click to view full Creator Profile & Payout credentials"
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
               <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.85rem', flexShrink: 0 }}>
-                {activeCreator.name.charAt(0)}
+                {creatorProfile.name.charAt(0)}
               </div>
               <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeCreator.name}</div>
-                <div style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeCreator.email}</div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {creatorProfile.name}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: '#ff5c00', fontWeight: 600 }}>
+                  View Creator Profile ↗
+                </div>
               </div>
             </div>
-          </div>
+            <ChevronRight size={14} color="#94a3b8" />
+          </button>
 
           <button onClick={onSignOut} className="btn-ghost" style={{ width: '100%', fontSize: '0.82rem', padding: '0.5rem', justifyContent: 'center', color: '#b91c1c' }}>
             <LogOut size={14} />
@@ -367,11 +439,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
               {activeTab} Overview
             </h1>
             <p style={{ color: '#64748b', fontSize: '0.88rem', marginTop: '0.2rem' }}>
-              Multi-tenant operations ledger • Zero AI inside app • Connected via Claude MCP
+              Multi-tenant commercial ledger • Connected to Stripe Test Sandbox
             </p>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button onClick={onOpenLanding} className="btn-ghost" style={{ fontSize: '0.85rem' }}>
+              <Globe size={14} color="#ff5c00" />
+              Product Landing Page
+            </button>
             <button onClick={loadData} className="btn-ghost" title="Refresh database sync">
               <RefreshCw size={14} />
               Sync
@@ -382,7 +458,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
             </button>
             <button onClick={() => setShowNewClientModal(true)} className="btn-ghost">
               <UserPlus size={14} />
-              + Add Client
+              + Add Partner
             </button>
             <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
               <Plus size={15} />
@@ -445,73 +521,115 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                   Zero AI Inside
                 </div>
                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  $0 Token Cost • Multi-Tenant DB
+                  $0 Token Cost • Claude Brain
                 </div>
               </div>
 
             </div>
 
-            {/* Visual Performance & Chart Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.25rem', marginBottom: '2rem' }}>
+            {/* Interactive Performance Row (GSAP Animated Semicircle Arc & Tooltips) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.9fr', gap: '1.25rem', marginBottom: '2rem' }}>
               
-              <div className="card-white" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              {/* Interactive Semicircle Score Gauge */}
+              <div
+                className="card-white"
+                onMouseEnter={() => setHoveredGauge(true)}
+                onMouseLeave={() => setHoveredGauge(false)}
+                style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}
+              >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Sales Performance</span>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Live</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Sales Velocity Score</span>
+                    <span className="badge-status badge-orange">Live GSAP</span>
                   </div>
-                  <div style={{ textAlign: 'center', margin: '2rem 0 1rem' }}>
-                    <div style={{ position: 'relative', width: '160px', height: '80px', margin: '0 auto', overflow: 'hidden' }}>
-                      <div style={{ width: '160px', height: '160px', border: '16px solid #f1f3f7', borderTopColor: '#ff5c00', borderRightColor: '#ff5c00', borderRadius: '50%', transform: 'rotate(-45deg)' }} />
+
+                  {/* Interactive Semicircle Arc */}
+                  <div style={{ position: 'relative', width: '180px', height: '95px', margin: '1.75rem auto 0.75rem', overflow: 'hidden' }}>
+                    <svg width="180" height="180" viewBox="0 0 180 180" style={{ transform: 'rotate(-180deg)' }}>
+                      <circle
+                        cx="90"
+                        cy="90"
+                        r="70"
+                        fill="none"
+                        stroke="#f1f3f7"
+                        strokeWidth="16"
+                      />
+                      <circle
+                        ref={gaugeRef}
+                        cx="90"
+                        cy="90"
+                        r="70"
+                        fill="none"
+                        stroke="#ff5c00"
+                        strokeWidth="16"
+                        strokeDasharray="440"
+                        strokeDashoffset="246"
+                        strokeLinecap="round"
+                        style={{ transition: 'stroke 200ms ease' }}
+                      />
+                    </svg>
+                    <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', textAlign: 'center' }}>
+                      <div className="tabular-nums" style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+                        88 <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>+1</span>
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
+                        of 100 points
+                      </div>
                     </div>
-                    <div className="tabular-nums" style={{ fontSize: '2.5rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem' }}>
-                      88 <span style={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 600 }}>+1</span>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>of 100 points operational score</div>
                   </div>
+
+                  {/* Hover breakdown tooltip */}
+                  {hoveredGauge ? (
+                    <div style={{ background: '#0f172a', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', textAlign: 'center', marginTop: '0.5rem' }}>
+                      Conversion: 92% • Revision Limit: 100% • Deposit Rate: 50%
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', fontSize: '0.78rem', color: '#64748b', marginTop: '0.5rem' }}>
+                      Hover for metric breakdown
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
+                <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
                   50% upfront deposit terms lock client production calendars 3.2x faster.
                 </div>
               </div>
 
-              {/* Monthly Pipeline Chart */}
-              <div className="card-white" style={{ padding: '1.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              {/* Monthly Pipeline Bar Chart with Hover Tooltips */}
+              <div className="card-white" style={{ padding: '1.75rem', position: 'relative' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                   <div>
                     <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>Monthly Pipeline Volume</div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Scope distribution ($USD)</div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Hover any month for detailed telemetry</div>
                   </div>
-                  <span className="badge-status badge-orange">Active: Jun ($24.0k)</span>
+                  {hoveredMonth ? (
+                    <div style={{ background: '#0f172a', color: '#fff', padding: '0.35rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {hoveredMonth.m}: {hoveredMonth.rev} ({hoveredMonth.conv})
+                    </div>
+                  ) : (
+                    <span className="badge-status badge-orange">Active: Jun ($24.0k)</span>
+                  )}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '180px', paddingTop: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-                  {[
-                    { m: 'Jan', h: 45, a: false },
-                    { m: 'Feb', h: 60, a: false },
-                    { m: 'Mar', h: 35, a: false },
-                    { m: 'Apr', h: 80, a: false },
-                    { m: 'May', h: 65, a: false },
-                    { m: 'Jun', h: 110, a: true },
-                    { m: 'Jul', h: 50, a: false },
-                    { m: 'Aug', h: 40, a: false },
-                    { m: 'Sep', h: 75, a: false },
-                    { m: 'Oct', h: 60, a: false },
-                    { m: 'Nov', h: 85, a: false },
-                    { m: 'Dec', h: 95, a: false },
-                  ].map((bar, i) => (
-                    <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '175px', paddingTop: '1rem', borderBottom: '1px solid #e5e7eb' }}>
+                  {monthlyBars.map((bar, i) => (
+                    <div
+                      key={i}
+                      onMouseEnter={() => setHoveredMonth(bar)}
+                      onMouseLeave={() => setHoveredMonth(null)}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', flex: 1, cursor: 'pointer' }}
+                    >
                       <div
                         style={{
                           width: '26px',
                           height: `${bar.h}px`,
                           borderRadius: '6px 6px 0 0',
-                          transition: 'all 200ms ease',
+                          transform: hoveredMonth?.m === bar.m ? 'scaleY(1.08)' : 'scaleY(1)',
+                          transition: 'all 180ms cubic-bezier(0.32, 0.72, 0, 1)',
                         }}
-                        className={bar.a ? 'bg-hatched-orange' : 'bg-hatched'}
+                        className={bar.a || hoveredMonth?.m === bar.m ? 'bg-hatched-orange' : 'bg-hatched'}
                       />
-                      <span style={{ fontSize: '0.72rem', color: bar.a ? '#ff5c00' : '#94a3b8', fontWeight: bar.a ? 800 : 500 }}>
+                      <span style={{ fontSize: '0.72rem', color: bar.a || hoveredMonth?.m === bar.m ? '#ff5c00' : '#94a3b8', fontWeight: bar.a || hoveredMonth?.m === bar.m ? 800 : 500 }}>
                         {bar.m}
                       </span>
                     </div>
@@ -523,7 +641,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
           </>
         )}
 
-        {/* View 2: PROPOSALS TABLE */}
+        {/* View 2: PROPOSALS TABLE (All client names strictly sanitized) */}
         {(activeTab === 'dashboard' || activeTab === 'proposals') && (
           <div className="card-white" style={{ padding: '1.75rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -570,11 +688,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                      <th style={{ padding: '0.85rem 1rem' }}>Scope & Deliverables</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Client</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Commercial Scope</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Partner Reference</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Milestone Status</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Total Scope</th>
-                      <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>50% Deposit</th>
+                      <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>50% Upfront</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'center' }}>Actions</th>
                     </tr>
                   </thead>
@@ -590,8 +708,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                             </div>
                           </td>
                           <td style={{ padding: '1rem', color: '#475569' }}>
-                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{p.client?.name || 'Client'}</div>
-                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.client?.email}</div>
+                            {/* Privacy Sanitized: Zero raw client names */}
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>Commercial Partner #{p.id.slice(-4).toUpperCase()}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Verified Production Account</div>
                           </td>
                           <td style={{ padding: '1rem' }}>
                             <span className={`badge-status ${isPaid ? 'badge-green' : 'badge-orange'}`}>
@@ -653,7 +772,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 <DollarSign size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
                 <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Invoices Issued Yet</div>
                 <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto' }}>
-                  Ask Claude: "Create an invoice for Acme: $2,400 balance due upon delivery."
+                  Ask Claude: "Create an invoice for $2,400 balance due upon delivery."
                 </p>
               </div>
             ) : (
@@ -661,8 +780,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                      <th style={{ padding: '0.85rem 1rem' }}>Invoice ID</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Client</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Invoice Reference</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Partner Account</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Due Date</th>
                       <th style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>Amount</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Status</th>
@@ -673,7 +792,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                     {invoices.map((inv: any) => (
                       <tr key={inv.id} style={{ borderBottom: '1px solid #f1f3f7' }}>
                         <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>#{inv.id}</td>
-                        <td style={{ padding: '1rem', color: '#475569' }}>{inv.client?.name || 'Client'}</td>
+                        <td style={{ padding: '1rem', color: '#475569' }}>Partner #{inv.id.slice(-4).toUpperCase()}</td>
                         <td style={{ padding: '1rem', color: '#64748b' }}>{inv.due_date || 'Due Upon Receipt'}</td>
                         <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
                           ${Number(inv.amount).toLocaleString()}
@@ -707,24 +826,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
           <div className="card-white" style={{ padding: '1.75rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Client Directory</h2>
-                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Registered commercial partners and billing addresses</p>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0f172a' }}>Commercial Partner Accounts</h2>
+                <p style={{ color: '#64748b', fontSize: '0.85rem' }}>Registered production partners and billing profiles</p>
               </div>
               <button onClick={() => setShowNewClientModal(true)} className="btn-orange">
                 <UserPlus size={15} />
-                + Add Client
+                + Add Partner
               </button>
             </div>
 
             {clients.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '3.5rem 1rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                 <Users size={36} color="#94a3b8" style={{ margin: '0 auto 0.75rem' }} />
-                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Clients Registered</div>
+                <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>No Partners Registered</div>
                 <p style={{ color: '#64748b', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto 1rem' }}>
-                  Register a client here or let Claude add them automatically via MCP.
+                  Register a commercial partner account here or let Claude add them automatically via MCP.
                 </p>
                 <button onClick={() => setShowNewClientModal(true)} className="btn-orange">
-                  + Add Client
+                  + Add Partner
                 </button>
               </div>
             ) : (
@@ -732,18 +851,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#64748b', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                      <th style={{ padding: '0.85rem 1rem' }}>Client Name</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Billing Email</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Partner Reference</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Account Status</th>
                       <th style={{ padding: '0.85rem 1rem' }}>Currency</th>
-                      <th style={{ padding: '0.85rem 1rem' }}>Registered</th>
+                      <th style={{ padding: '0.85rem 1rem' }}>Registered Date</th>
                     </tr>
                   </thead>
                   <tbody>
                     {clients.map((c: any) => (
                       <tr key={c.id} style={{ borderBottom: '1px solid #f1f3f7' }}>
-                        <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>{c.name}</td>
-                        <td style={{ padding: '1rem', color: '#64748b' }}>{c.email}</td>
-                        <td style={{ padding: '1rem', fontWeight: 600, color: '#ff5c00' }}>{c.currency || 'USD'}</td>
+                        <td style={{ padding: '1rem', fontWeight: 700, color: '#0f172a' }}>Partner #{c.id.slice(-4).toUpperCase()}</td>
+                        <td style={{ padding: '1rem', color: '#10b981', fontWeight: 600 }}>Active Production Account</td>
+                        <td style={{ padding: '1rem', fontWeight: 700, color: '#ff5c00' }}>{c.currency || 'USD'}</td>
                         <td style={{ padding: '1rem', color: '#94a3b8', fontSize: '0.8rem' }}>{new Date(c.created_at || Date.now()).toLocaleDateString()}</td>
                       </tr>
                     ))}
@@ -756,7 +875,124 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
 
       </main>
 
-      {/* Modal 1: Human Edit Proposal */}
+      {/* Modal 1: Creator Profile & Payout Settings (Triggered by Alex Rivera Profile Button) */}
+      {showProfileModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 60 }}>
+          <div className="card-white" style={{ maxWidth: '560px', width: '100%', padding: '2.25rem', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #f1f3f7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
+                  A
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>{creatorProfile.name}</h3>
+                  <p style={{ color: '#64748b', fontSize: '0.8rem' }}>Creator Profile & Payout Credentials</p>
+                </div>
+              </div>
+              <button onClick={() => setShowProfileModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Profile Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.75rem' }}>
+              
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Studio Entity</label>
+                <div style={{ position: 'relative' }}>
+                  <Building size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                  <input
+                    type="text"
+                    value={creatorProfile.studioName}
+                    onChange={e => setCreatorProfile({ ...creatorProfile, studioName: e.target.value })}
+                    className="input-clean"
+                    style={{ paddingLeft: '2rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Email Address</label>
+                  <div style={{ position: 'relative' }}>
+                    <Mail size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                    <input
+                      type="email"
+                      value={creatorProfile.email}
+                      onChange={e => setCreatorProfile({ ...creatorProfile, email: e.target.value })}
+                      className="input-clean"
+                      style={{ paddingLeft: '2rem' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.3rem' }}>Contact Phone / WhatsApp</label>
+                  <div style={{ position: 'relative' }}>
+                    <Phone size={15} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                    <input
+                      type="text"
+                      value={creatorProfile.phone}
+                      onChange={e => setCreatorProfile({ ...creatorProfile, phone: e.target.value })}
+                      className="input-clean"
+                      style={{ paddingLeft: '2rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Stripe Payment & Payout Routing Details */}
+              <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <CreditCard size={16} color="#ff5c00" />
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>Stripe Payout Rail</span>
+                  </div>
+                  <span className="badge-status badge-green">Payouts Active</span>
+                </div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.8rem', color: '#64748b' }}>
+                  <div>Stripe Account ID: <strong style={{ color: '#0f172a' }}>{creatorProfile.stripeAccountId}</strong></div>
+                  <div>Settlement Currency: <strong style={{ color: '#0f172a' }}>{creatorProfile.currency} ($)</strong></div>
+                  <div>Bank Payout: <strong style={{ color: '#0f172a' }}>{creatorProfile.bankRouting}</strong></div>
+                  <div>Tax EIN / ID: <strong style={{ color: '#0f172a' }}>{creatorProfile.taxId}</strong></div>
+                </div>
+              </div>
+
+              {/* MCP Protocol Secret */}
+              <div style={{ background: '#fff5f0', padding: '1rem', borderRadius: '10px', border: '1px solid rgba(255,92,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>Claude MCP Secret Token</span>
+                  <button onClick={copyApiKey} style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer' }}>
+                    {copiedKey ? 'Copied' : 'Copy Key'}
+                  </button>
+                </div>
+                <code style={{ fontSize: '0.8rem', color: '#0f172a', background: '#fff', padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block' }}>
+                  {activeCreator.api_key}
+                </code>
+              </div>
+
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button onClick={() => setShowProfileModal(false)} className="btn-ghost">
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  alert('Profile & payout credentials saved successfully!');
+                  setShowProfileModal(false);
+                }}
+                className="btn-orange"
+              >
+                Save Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Human Edit Proposal */}
       {editingProposal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 50 }}>
           <div className="card-white" style={{ maxWidth: '580px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -847,7 +1083,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
         </div>
       )}
 
-      {/* Modal 2: Create Proposal In App */}
+      {/* Modal 3: Create Proposal */}
       {showNewProposalModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 50 }}>
           <div className="card-white" style={{ maxWidth: '580px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
@@ -868,7 +1104,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Acme 3-Week Product Launch Brand Video"
+                  placeholder="e.g. Commercial Brand Video Campaign (3-Week Launch)"
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   className="input-clean"
@@ -878,7 +1114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
 
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
-                  Assign Client
+                  Partner Account
                 </label>
                 <select
                   value={newClientId}
@@ -887,7 +1123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                   required
                 >
                   {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.email})</option>
+                    <option key={c.id} value={c.id}>Partner #{c.id.slice(-4).toUpperCase()}</option>
                   ))}
                 </select>
               </div>
@@ -898,7 +1134,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                 </label>
                 <textarea
                   rows={4}
-                  placeholder="Describe the deliverables, timeline, music sync licensing, and post-production specifics..."
+                  placeholder="Describe the deliverables, timeline, audio licensing, and post-production specifics..."
                   value={newBody}
                   onChange={e => setNewBody(e.target.value)}
                   className="input-clean"
@@ -956,14 +1192,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
         </div>
       )}
 
-      {/* Modal 3: Add Client */}
+      {/* Modal 4: Add Partner */}
       {showNewClientModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 50 }}>
           <div className="card-white" style={{ maxWidth: '460px', width: '100%', padding: '2rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Register New Client</h3>
-                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Add a client to your studio ledger</p>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a' }}>Register Commercial Partner</h3>
+                <p style={{ color: '#64748b', fontSize: '0.82rem' }}>Add a partner account to your studio ledger</p>
               </div>
               <button onClick={() => setShowNewClientModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
                 <X size={20} />
@@ -973,11 +1209,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
             <form onSubmit={handleCreateClient}>
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
-                  Client Name / Company
+                  Partner Account Label
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Sarah Jenkins (Acme Studios)"
+                  placeholder="e.g. Media Production Group (Ref #1043)"
                   value={clientName}
                   onChange={e => setClientName(e.target.value)}
                   className="input-clean"
@@ -987,11 +1223,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
 
               <div style={{ marginBottom: '1.5rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
-                  Billing Email
+                  Partner Billing Email
                 </label>
                 <input
                   type="email"
-                  placeholder="sarah@acmestudios.io"
+                  placeholder="billing@partnergroup.io"
                   value={clientEmail}
                   onChange={e => setClientEmail(e.target.value)}
                   className="input-clean"
@@ -1004,7 +1240,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
                   Cancel
                 </button>
                 <button type="submit" className="btn-orange">
-                  Add Client
+                  Add Partner
                 </button>
               </div>
             </form>
@@ -1012,7 +1248,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut }) => {
         </div>
       )}
 
-      {/* Modal 4: Claude MCP Secret Token */}
+      {/* Modal 5: Claude MCP Secret Token */}
       {showKeyModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 60 }}>
           <div className="card-white" style={{ maxWidth: '520px', width: '100%', padding: '2rem' }}>
