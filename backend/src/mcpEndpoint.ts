@@ -15,6 +15,7 @@ import {
   getAllInvoices,
   getCreatorByApiKey,
   getCreatorById,
+  createCreator,
 } from './db';
 import { Creator } from './types';
 import { nanoid } from 'nanoid';
@@ -295,7 +296,30 @@ async function resolveCreatorFromReq(req: Request): Promise<Creator | null> {
   if (apiKey) {
     const creator = await getCreatorByApiKey(apiKey);
     if (creator) return creator;
+
+    // Real MCP Client Isolation:
+    // If an API key is provided, NEVER fall back to demo account Alex Rivera!
+    // Auto-provision a clean, isolated studio account tied to this API key.
+    if (apiKey.startsWith('stl_live_')) {
+      const studioName = (req.query.studio as string) || 'My Creator Studio';
+      const newLiveCreator = await createCreator({
+        id: `cr_${nanoid(10)}`,
+        name: 'Studio Owner',
+        email: `${apiKey.slice(0, 16)}@settle.studio`,
+        password_hash: 'live',
+        studio_name: studioName,
+        currency: 'INR',
+        api_key: apiKey,
+        plan: 'Pro',
+      });
+      console.log(`[MCP] Provisioned clean isolated studio for key ${apiKey}: ${newLiveCreator.id}`);
+      return newLiveCreator;
+    }
+
+    return null;
   }
+
+  // Only unauthenticated test probes without any API key fall back to demo
   return await getCreatorById('cr_alex_rivera');
 }
 
