@@ -99,7 +99,7 @@ async function startServer() {
     console.warn('[SEED] Auto-seed check warning:', err.message);
   }
 
-  if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  if (process.env.NODE_ENV !== 'test') {
     app.listen(PORT, () => {
       console.log(`===============================================`);
       console.log(`🚀 Settle Backend running on port ${PORT}`);
