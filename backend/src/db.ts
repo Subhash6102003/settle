@@ -91,54 +91,79 @@ if (isPostgres) {
 
 export async function initDb(): Promise<void> {
   if (isPostgres && pgPool) {
-    await pgPool.query(`
-      CREATE TABLE IF NOT EXISTS clients (
-        id VARCHAR(64) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
-        currency VARCHAR(10) DEFAULT 'USD',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+    try {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS creators (
+          id VARCHAR(64) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password_hash VARCHAR(255) DEFAULT 'demo_pass',
+          studio_name VARCHAR(255) NOT NULL,
+          currency VARCHAR(10) DEFAULT 'USD',
+          api_key VARCHAR(128) UNIQUE NOT NULL,
+          plan VARCHAR(32) DEFAULT 'Pro',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-      CREATE TABLE IF NOT EXISTS proposals (
-        id VARCHAR(64) PRIMARY KEY,
-        slug VARCHAR(128) UNIQUE NOT NULL,
-        client_id VARCHAR(64) NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        body TEXT NOT NULL,
-        status VARCHAR(32) DEFAULT 'DRAFT',
-        total_amount NUMERIC DEFAULT 0,
-        deposit_amount NUMERIC DEFAULT 0,
-        deposit_paid INTEGER DEFAULT 0,
-        currency VARCHAR(10) DEFAULT 'USD',
-        revisions_included INTEGER DEFAULT 2,
-        turnaround_days INTEGER DEFAULT 14,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
+        CREATE TABLE IF NOT EXISTS clients (
+          id VARCHAR(64) PRIMARY KEY,
+          creator_id VARCHAR(64),
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          currency VARCHAR(10) DEFAULT 'USD',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-      CREATE TABLE IF NOT EXISTS line_items (
-        id VARCHAR(64) PRIMARY KEY,
-        proposal_id VARCHAR(64) NOT NULL,
-        description TEXT NOT NULL,
-        quantity NUMERIC DEFAULT 1,
-        unit_price NUMERIC DEFAULT 0,
-        amount NUMERIC DEFAULT 0
-      );
+        CREATE TABLE IF NOT EXISTS proposals (
+          id VARCHAR(64) PRIMARY KEY,
+          slug VARCHAR(128) UNIQUE NOT NULL,
+          creator_id VARCHAR(64),
+          client_id VARCHAR(64) NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          body TEXT NOT NULL,
+          status VARCHAR(32) DEFAULT 'SENT',
+          total_amount NUMERIC DEFAULT 0,
+          deposit_amount NUMERIC DEFAULT 0,
+          deposit_paid INTEGER DEFAULT 0,
+          currency VARCHAR(10) DEFAULT 'USD',
+          revisions_included INTEGER DEFAULT 2,
+          turnaround_days INTEGER DEFAULT 14,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
 
-      CREATE TABLE IF NOT EXISTS invoices (
-        id VARCHAR(64) PRIMARY KEY,
-        proposal_id VARCHAR(64),
-        client_id VARCHAR(64) NOT NULL,
-        amount NUMERIC NOT NULL,
-        due_date VARCHAR(64),
-        status VARCHAR(32) DEFAULT 'UNPAID',
-        stripe_checkout_session_id VARCHAR(255),
-        stripe_payment_intent_id VARCHAR(255),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('[DB] PostgreSQL schemas verified.');
+        CREATE TABLE IF NOT EXISTS line_items (
+          id VARCHAR(64) PRIMARY KEY,
+          proposal_id VARCHAR(64) NOT NULL,
+          description TEXT NOT NULL,
+          quantity NUMERIC DEFAULT 1,
+          unit_price NUMERIC DEFAULT 0,
+          amount NUMERIC DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS invoices (
+          id VARCHAR(64) PRIMARY KEY,
+          creator_id VARCHAR(64),
+          proposal_id VARCHAR(64),
+          client_id VARCHAR(64) NOT NULL,
+          amount NUMERIC NOT NULL,
+          due_date VARCHAR(64),
+          status VARCHAR(32) DEFAULT 'UNPAID',
+          stripe_checkout_session_id VARCHAR(255),
+          stripe_payment_intent_id VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        INSERT INTO creators (id, name, email, studio_name, currency, api_key, plan)
+        VALUES 
+          ('cr_alex_rivera', 'Alex Rivera', 'alex@apexcut.studio', 'Apex Cut Creative Studio', 'USD', 'stl_live_alex_9a82b1', 'Pro'),
+          ('cr_elena_vance', 'Elena Vance', 'elena@vancefilms.io', 'Vance Motion Works', 'USD', 'stl_live_elena_7c34d9', 'Pro')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+      console.log('[DB] PostgreSQL schemas verified and self-initialized.');
+    } catch (e: any) {
+      console.error('[DB] PostgreSQL schema initialization warning:', e.message);
+    }
   } else {
     loadLocalData();
     console.log('[DB] Local store initialized with', localData.proposals.length, 'proposals.');
