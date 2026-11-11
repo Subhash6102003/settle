@@ -140,16 +140,70 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     return () => clearInterval(interval);
   }, []);
 
-  // GSAP Gauge Animation on load
+  // 1. Avg Contract Scope
+  const avgContractScope = proposals.length > 0
+    ? Math.round(proposals.reduce((acc, p) => acc + Number(p.total_amount || 0), 0) / proposals.length)
+    : 0;
+
+  // 2. Dynamic Operational Velocity Score (0 - 100)
+  const acceptedProposals = proposals.filter(p => p.status === 'ACCEPTED' || Boolean(p.deposit_paid));
+  const openProposals = proposals.filter(p => p.status !== 'PAID');
+  const totalProposalsCount = proposals.length;
+
+  const operationalScore = totalProposalsCount === 0
+    ? 0
+    : Math.min(
+        100,
+        Math.round(
+          (acceptedProposals.length / totalProposalsCount) * 40 +
+          (proposals.reduce((acc, p) => acc + (Number(p.deposit_amount) / (Number(p.total_amount) || 1)), 0) / totalProposalsCount) * 30 +
+          (proposals.reduce((acc, p) => acc + (p.turnaround_days <= 14 ? 30 : 15), 0) / totalProposalsCount)
+        )
+      );
+
+  // 3. Dynamic Monthly Pipeline Bars
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const currentMonthIdx = new Date().getMonth();
+
+  const monthlyData = monthNames.map((m, idx) => {
+    const monthProposals = proposals.filter(p => {
+      if (!p.created_at) return idx === currentMonthIdx;
+      const d = new Date(p.created_at);
+      return !isNaN(d.getTime()) && d.getMonth() === idx;
+    });
+
+    const rawRev = monthProposals.reduce((sum, p) => sum + Number(p.total_amount || 0), 0);
+    const paidCount = monthProposals.filter(p => p.status === 'ACCEPTED' || Boolean(p.deposit_paid)).length;
+    const convRate = monthProposals.length > 0 ? `${Math.round((paidCount / monthProposals.length) * 100)}%` : '0%';
+
+    return {
+      m,
+      rawRev,
+      rev: `$${rawRev.toLocaleString()}`,
+      conv: convRate,
+      a: idx === currentMonthIdx,
+      count: monthProposals.length,
+    };
+  });
+
+  const maxMonthRev = Math.max(...monthlyData.map(d => d.rawRev), 0);
+  const monthlyBars = monthlyData.map(d => ({
+    ...d,
+    h: maxMonthRev > 0 && d.rawRev > 0 ? Math.max(16, Math.round((d.rawRev / maxMonthRev) * 120)) : 8,
+  }));
+
+  const activeMonthData = monthlyBars[currentMonthIdx];
+
+  // GSAP Gauge Animation on load & metric update
   useEffect(() => {
     if (gaugeRef.current) {
-      gsap.fromTo(
+      const targetOffset = operationalScore === 0 ? 440 : 440 - (440 * (operationalScore / 100) * 0.5);
+      gsap.to(
         gaugeRef.current,
-        { strokeDashoffset: 440 },
-        { strokeDashoffset: 440 - (440 * 0.88 * 0.5), duration: 1.2, ease: 'power2.out' }
+        { strokeDashoffset: targetOffset, duration: 1.2, ease: 'power2.out' }
       );
     }
-  }, [loading]);
+  }, [operationalScore, loading]);
 
   const handleOpenEdit = (p: Proposal) => {
     setEditingProposal(p);
@@ -326,21 +380,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     if (statusFilter === 'PENDING') return matchesSearch && !p.deposit_paid && p.status !== 'ACCEPTED';
     return matchesSearch;
   });
-
-  const monthlyBars = [
-    { m: 'Jan', h: 45, rev: '$4,200', conv: '8.2%', a: false },
-    { m: 'Feb', h: 60, rev: '$6,800', conv: '9.4%', a: false },
-    { m: 'Mar', h: 35, rev: '$3,500', conv: '7.1%', a: false },
-    { m: 'Apr', h: 80, rev: '$12,400', conv: '11.0%', a: false },
-    { m: 'May', h: 65, rev: '$8,900', conv: '10.2%', a: false },
-    { m: 'Jun', h: 110, rev: '$24,064', conv: '12.5%', a: true }, // Current month
-    { m: 'Jul', h: 50, rev: '$5,800', conv: '8.8%', a: false },
-    { m: 'Aug', h: 40, rev: '$4,100', conv: '7.9%', a: false },
-    { m: 'Sep', h: 75, rev: '$9,800', conv: '10.5%', a: false },
-    { m: 'Oct', h: 60, rev: '$7,200', conv: '9.1%', a: false },
-    { m: 'Nov', h: 85, rev: '$14,200', conv: '11.8%', a: false },
-    { m: 'Dec', h: 95, rev: '$16,500', conv: '12.2%', a: false },
-  ];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f7f8fa' }}>
@@ -539,8 +578,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
                   ${summary ? Number(summary.pipeline_value).toLocaleString() : '0'}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
-                  ↑ 12% <span style={{ color: '#94a3b8', fontWeight: 400 }}>from active proposals</span>
+                <div style={{ fontSize: '0.8rem', color: summary && summary.pipeline_value > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
+                  {summary && summary.pipeline_value > 0
+                    ? `↑ ${openProposals.length} active scope${openProposals.length > 1 ? 's' : ''}`
+                    : '0 open scopes'}
                 </div>
               </div>
 
@@ -552,8 +593,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#ff5c00', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
                   ${summary ? Number(summary.collected_deposits).toLocaleString() : '0'}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
-                  ↑ 9% <span style={{ color: '#94a3b8', fontWeight: 400 }}>secured via Stripe</span>
+                <div style={{ fontSize: '0.8rem', color: summary && summary.collected_deposits > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
+                  {summary && summary.collected_deposits > 0
+                    ? `↑ ${acceptedProposals.length} deposit${acceptedProposals.length > 1 ? 's' : ''} secured`
+                    : '0 deposits collected'}
                 </div>
               </div>
 
@@ -565,8 +608,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
                   {summary ? summary.total_accepted_proposals : 0} <span style={{ fontSize: '1.1rem', color: '#94a3b8' }}>/ {proposals.length}</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
-                  ↑ 7% <span style={{ color: '#94a3b8', fontWeight: 400 }}>acceptance conversion</span>
+                <div style={{ fontSize: '0.8rem', color: acceptedProposals.length > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
+                  {totalProposalsCount > 0
+                    ? `↑ ${Math.round((acceptedProposals.length / totalProposalsCount) * 100)}% conversion`
+                    : '0% conversion'}
                 </div>
               </div>
 
@@ -576,10 +621,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <Award size={16} color="#ff5c00" />
                 </div>
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-                  ${proposals.length > 0 ? Math.round(proposals.reduce((acc, p) => acc + Number(p.total_amount || 0), 0) / proposals.length).toLocaleString() : '4,800'}
+                  ${avgContractScope.toLocaleString()}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
-                  ↑ 14% <span style={{ color: '#94a3b8', fontWeight: 400 }}>vs commercial benchmark</span>
+                <div style={{ fontSize: '0.8rem', color: avgContractScope > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
+                  {avgContractScope > 0
+                    ? `↑ Across ${proposals.length} scope${proposals.length > 1 ? 's' : ''}`
+                    : '0 active scopes logged'}
                 </div>
               </div>
 
@@ -598,7 +645,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Operational Score</span>
-                    <span className="badge-status badge-orange">Live Velocity</span>
+                    <span
+                      className={`badge-status ${operationalScore > 0 ? 'badge-orange' : 'badge-slate'}`}
+                      style={operationalScore === 0 ? { background: '#f1f5f9', color: '#64748b' } : {}}
+                    >
+                      {operationalScore > 0 ? 'Live Velocity' : 'Awaiting Data'}
+                    </span>
                   </div>
 
                   {/* Interactive Semicircle Arc */}
@@ -621,14 +673,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                         stroke="#ff5c00"
                         strokeWidth="16"
                         strokeDasharray="440"
-                        strokeDashoffset="246"
+                        strokeDashoffset="440"
                         strokeLinecap="round"
                         style={{ transition: 'stroke 200ms ease' }}
                       />
                     </svg>
                     <div style={{ position: 'absolute', bottom: '0', left: '0', right: '0', textAlign: 'center' }}>
                       <div className="tabular-nums" style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
-                        88 <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>+1</span>
+                        {operationalScore} {operationalScore > 0 && <span style={{ fontSize: '0.85rem', color: '#10b981', fontWeight: 600 }}>+1</span>}
                       </div>
                       <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.2rem' }}>
                         of 100 points
@@ -639,7 +691,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   {/* Hover breakdown tooltip */}
                   {hoveredGauge ? (
                     <div style={{ background: '#0f172a', color: '#fff', padding: '0.5rem 0.75rem', borderRadius: '8px', fontSize: '0.75rem', textAlign: 'center', marginTop: '0.5rem' }}>
-                      Conversion: 92% • Revision Limit: 100% • Deposit Rate: 50%
+                      {totalProposalsCount > 0 ? (
+                        <>Conversion: {Math.round((acceptedProposals.length / totalProposalsCount) * 100)}% • Deposits: {summary?.collected_deposits > 0 ? 'Active' : 'Pending'} • SLA: Healthy</>
+                      ) : (
+                        <>0 proposals logged • Create a proposal or connect Claude Desktop</>
+                      )}
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', fontSize: '0.78rem', color: '#64748b', marginTop: '0.5rem' }}>
@@ -649,7 +705,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </div>
 
                 <div style={{ background: '#f8fafc', padding: '0.85rem 1rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#64748b' }}>
-                  50% upfront deposit terms lock client production calendars 3.2x faster.
+                  {totalProposalsCount > 0
+                    ? '50% upfront deposit terms lock client production calendars 3.2x faster.'
+                    : 'Connect Claude Desktop via MCP or create a proposal to begin ledger telemetry.'}
                 </div>
               </div>
 
@@ -665,7 +723,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                       {hoveredMonth.m}: {hoveredMonth.rev} ({hoveredMonth.conv})
                     </div>
                   ) : (
-                    <span className="badge-status badge-orange">Active: Jun ($24.0k)</span>
+                    <span
+                      className={`badge-status ${activeMonthData?.rawRev > 0 ? 'badge-orange' : 'badge-slate'}`}
+                      style={activeMonthData?.rawRev === 0 ? { background: '#f1f5f9', color: '#64748b' } : {}}
+                    >
+                      Active: {activeMonthData?.m} ({activeMonthData?.rev})
+                    </span>
                   )}
                 </div>
 
@@ -685,7 +748,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                           transform: hoveredMonth?.m === bar.m ? 'scaleY(1.08)' : 'scaleY(1)',
                           transition: 'all 180ms cubic-bezier(0.32, 0.72, 0, 1)',
                         }}
-                        className={bar.a || hoveredMonth?.m === bar.m ? 'bg-hatched-orange' : 'bg-hatched'}
+                        className={bar.rawRev > 0 || hoveredMonth?.m === bar.m ? 'bg-hatched-orange' : 'bg-hatched'}
                       />
                       <span style={{ fontSize: '0.72rem', color: bar.a || hoveredMonth?.m === bar.m ? '#ff5c00' : '#94a3b8', fontWeight: bar.a || hoveredMonth?.m === bar.m ? 800 : 500 }}>
                         {bar.m}
