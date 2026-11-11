@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { createInvoice, getAllInvoices, getClientById, getInvoiceById } from '../db';
+import { createInvoice, getAllInvoices, getClientById, getInvoiceById, getCreatorById } from '../db';
 import { stripe } from '../stripe';
+import { sendInvoiceReceiptEmail } from '../email';
 import { nanoid } from 'nanoid';
 
 const router = Router();
@@ -99,6 +100,40 @@ router.get('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Invoice not found' });
     }
     res.json({ invoice });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Send official invoice & receipt email to client via SMTP rail
+router.post('/:id/send-email', async (req: Request, res: Response) => {
+  try {
+    const invoice = await getInvoiceById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+    const client = await getClientById(invoice.client_id);
+    const creator = await getCreatorById(invoice.creator_id || client?.creator_id || 'cr_alex_rivera');
+    if (!creator) {
+      return res.status(404).json({ error: 'Creator not found' });
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://settle-blond.vercel.app';
+    const receiptUrl = `${frontendUrl}/invoices/${invoice.id}`;
+
+    const dispatchRes = await sendInvoiceReceiptEmail(
+      invoice,
+      client || { name: 'Commercial Partner', email: req.body.email || 'billing@partner.com' },
+      creator,
+      receiptUrl
+    );
+
+    res.json({
+      success: true,
+      message: `Official invoice receipt emailed to ${client?.email || req.body.email} via SMTP rail.`,
+      dispatch: dispatchRes,
+      receipt_url: receiptUrl,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

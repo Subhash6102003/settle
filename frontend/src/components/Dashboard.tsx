@@ -397,60 +397,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     }
   };
 
-  const handleSendOnboardingEmail = async () => {
+  const handleSendInvoiceEmailViaSmtp = async (invoiceId: string, clientEmail?: string) => {
     try {
-      const cur = creator || getActiveCreator();
-      const res = await fetch(`${API_BASE}/api/auth/email/onboarding`, {
+      setReminderToast(`Dispatching official receipt via SMTP rail...`);
+      const res = await fetch(`${API_BASE}/api/invoices/${invoiceId}/send-email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ creator_id: cur.id }),
+        body: JSON.stringify({ email: clientEmail }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to trigger onboarding email');
-      setReminderToast(`Onboarding email sent to ${cur.email}! (SMTP Rail Active)`);
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch email');
+      setReminderToast(`Official invoice & receipt sent to ${clientEmail || 'client'} via SMTP rail!`);
       setTimeout(() => setReminderToast(null), 3500);
     } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const handleSendMcpEmail = async () => {
-    try {
-      const cur = creator || getActiveCreator();
-      const res = await fetch(`${API_BASE}/api/auth/email/mcp-connected`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ creator_id: cur.id, client_type: 'Claude / Universal MCP Agent' }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to trigger MCP email');
-      setReminderToast(`MCP Connected email dispatched to ${cur.email}!`);
-      setTimeout(() => setReminderToast(null), 3500);
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const handleResetDatabase = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to clean up all data in the database?\n\nThis will remove all test scopes, proposals, clients, and invoices. Only clean demo studios will be preserved.'
-    );
-    if (!confirmed) return;
-    try {
-      setLoading(true);
-      const res = await fetch(`${API_BASE}/api/auth/reset-db`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to reset database');
-      setShowProfileModal(false);
-      setReminderToast('Database cleaned successfully! Starting fresh with demo records.');
-      setTimeout(() => setReminderToast(null), 3500);
-      await loadData();
-    } catch (err: any) {
-      alert(err.message);
-      setLoading(false);
+      alert(err.message || 'Error dispatching email');
     }
   };
 
@@ -1196,18 +1156,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                             </span>
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                               <a
                                 href={`/invoices/${inv.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="btn-ghost"
-                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', textDecoration: 'none' }}
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none' }}
                                 title="Open Executive Receipt"
                               >
                                 <ExternalLink size={13} color="#ff5c00" />
                                 Receipt
                               </a>
+
+                              <button
+                                onClick={() => handleSendInvoiceEmailViaSmtp(inv.id, inv.client?.email)}
+                                className="btn-ghost"
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                title="Email official receipt to client via SMTP rail"
+                              >
+                                <Mail size={13} color="#ff5c00" />
+                                Email
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  const receiptUrl = `${window.location.origin}/invoices/${inv.id}`;
+                                  const text = `Hello! Here is the official invoice & payment receipt for #${inv.id} (${currencySymbol}${Number(inv.amount).toLocaleString()}) from ${creatorProfile.studioName}:\n${receiptUrl}`;
+                                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                                }}
+                                className="btn-ghost"
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                title="Share receipt via WhatsApp"
+                              >
+                                <Phone size={13} color="#16a34a" />
+                                WhatsApp
+                              </button>
+
                               <button
                                 onClick={() => {
                                   const url = `${window.location.origin}/invoices/${inv.id}`;
@@ -1216,15 +1201,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                                   setTimeout(() => setReminderToast(null), 2000);
                                 }}
                                 className="btn-ghost"
-                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                                style={{ padding: '0.35rem 0.6rem', fontSize: '0.78rem' }}
                                 title="Copy Public Receipt Link"
                               >
                                 Copy Link
                               </button>
+
                               <button
                                 onClick={() => handleSendReminder(inv.id)}
                                 className="btn-ghost"
-                                style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                                style={{ padding: '0.35rem 0.5rem', fontSize: '0.78rem' }}
                                 title="Send Payment Reminder"
                               >
                                 <Send size={13} />
@@ -1456,66 +1442,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 <code style={{ fontSize: '0.8rem', color: '#0f172a', background: '#fff', padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #e2e8f0', display: 'block' }}>
                   {activeCreator.api_key}
                 </code>
-              </div>
-
-              {/* Email & SMTP Notification Rail */}
-              <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a' }}>
-                    <Mail size={15} color="#ff5c00" />
-                    <span>Email & SMTP Notification Rail</span>
-                  </div>
-                  <span className="badge-status badge-green" style={{ fontSize: '0.72rem' }}>SMTP Rail Ready</span>
-                </div>
-                <p style={{ fontSize: '0.76rem', color: '#64748b', margin: '0 0 0.75rem', lineHeight: 1.4 }}>
-                  Dispatches onboarding badges and real-time MCP connection alerts to your inbox:
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    onClick={handleSendOnboardingEmail}
-                    className="btn-ghost"
-                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.7rem', border: '1px solid #cbd5e1' }}
-                  >
-                    Send Onboarding Email
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSendMcpEmail}
-                    className="btn-ghost"
-                    style={{ fontSize: '0.76rem', padding: '0.4rem 0.7rem', border: '1px solid #cbd5e1' }}
-                  >
-                    Send MCP Connected Email
-                  </button>
-                </div>
-              </div>
-
-              {/* Clean Slate Database Reset */}
-              <div style={{ background: '#fff1f2', padding: '1rem', borderRadius: '10px', border: '1px solid #fecdd3' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                  <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#be123c', textTransform: 'uppercase' }}>
-                    Database Clean Slate (PostgreSQL Reset)
-                  </span>
-                </div>
-                <p style={{ fontSize: '0.75rem', color: '#9f1239', margin: '0 0 0.6rem', lineHeight: 1.4 }}>
-                  Wipe all test scopes, proposals, clients, and ephemeral data. Clean demo accounts will be preserved.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResetDatabase}
-                  style={{
-                    background: '#e11d48',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.4rem 0.85rem',
-                    fontSize: '0.76rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Reset Database to Clean Demo State
-                </button>
               </div>
 
             </div>

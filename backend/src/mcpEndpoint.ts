@@ -294,10 +294,15 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
         profileGuidance = `\n\nTip: You can ask the creator for their studio bio/description and services using update_studio_profile so it renders permanently on their executive receipts.`;
       }
 
+      const clientName = matchedClient?.name || a.client_name || a.client_id;
+      const clientEmail = matchedClient?.email || a.client_email || 'billing@partner.com';
+      const waText = encodeURIComponent(`Hello! Here is the official invoice & payment receipt for #${invoice.id} (${currency} ${invoice.amount.toLocaleString()}) from ${creator.studio_name}:\n${receiptUrl}`);
+      const waLink = `https://api.whatsapp.com/send?text=${waText}`;
+
       return {
         content: [{
           type: 'text',
-          text: `Invoice #${invoice.id} created in your Settle ledger!\n\nClient: ${matchedClient?.name || a.client_name || a.client_id} (${resolvedClientId})\nAmount: ${currency} ${invoice.amount.toLocaleString()}\nDue Date: ${invoice.due_date}\nStatus: UNPAID\n\nPublic Executive Receipt & Stripe Payment Link: ${receiptUrl}\n\nClient can open this official receipt link to review payment terms and settle directly.${profileGuidance}`,
+          text: `Official Invoice #${invoice.id} created successfully in your Settle ledger!\n\n• Partner: ${clientName} (${clientEmail})\n• Amount: ${currency} ${invoice.amount.toLocaleString()}\n• Due Date: ${invoice.due_date}\n• Status: UNPAID\n\nOfficial Executive Receipt & Stripe Payment Link:\n${receiptUrl}\n\nClient Delivery Rail Options:\n1. Direct Email: Official receipt notification is prepared for ${clientEmail} via Settle SMTP rail.\n2. WhatsApp Share: ${waLink}\n3. Direct Link: ${receiptUrl}${profileGuidance}`,
         }],
       };
     }
