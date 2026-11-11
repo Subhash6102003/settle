@@ -99,7 +99,7 @@ async function startServer() {
     console.warn('[SEED] Auto-seed check warning:', err.message);
   }
 
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
     app.listen(PORT, () => {
       console.log(`===============================================`);
       console.log(`🚀 Settle Backend running on port ${PORT}`);
@@ -114,5 +114,11 @@ startServer().catch(err => {
   console.warn('[SERVER] Startup warning:', err);
 });
 
+// Universal export for both Vercel Serverless (CommonJS function) and ES Module imports
+const handler = (req: any, res: any) => app(req, res);
+(handler as any).default = app;
+(handler as any).app = app;
+
+module.exports = handler;
 export default app;
 export { app };
