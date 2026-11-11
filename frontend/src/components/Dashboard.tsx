@@ -15,7 +15,6 @@ import {
   ExternalLink,
   X,
   RefreshCw,
-  ShieldCheck,
   Search,
   Download,
   Key,
@@ -31,7 +30,8 @@ import {
   Mail,
   Building,
   Globe,
-  ChevronRight
+  ChevronRight,
+  Award
 } from 'lucide-react';
 import gsap from 'gsap';
 
@@ -514,14 +514,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
 
               <div className="card-white" style={{ padding: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#64748b', fontSize: '0.82rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                  <span>Volopay Compliance</span>
-                  <ShieldCheck size={16} color="#10b981" />
+                  <span>Avg Contract Scope</span>
+                  <Award size={16} color="#ff5c00" />
                 </div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', marginTop: '0.65rem', marginBottom: '0.25rem' }}>
-                  Zero AI Inside
+                <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
+                  ${proposals.length > 0 ? Math.round(proposals.reduce((acc, p) => acc + Number(p.total_amount || 0), 0) / proposals.length).toLocaleString() : '4,800'}
                 </div>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  $0 Token Cost • Claude Brain
+                <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600 }}>
+                  ↑ 14% <span style={{ color: '#94a3b8', fontWeight: 400 }}>vs commercial benchmark</span>
                 </div>
               </div>
 
@@ -539,8 +539,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSignOut, onOpenLanding }
               >
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Sales Velocity Score</span>
-                    <span className="badge-status badge-orange">Live GSAP</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#0f172a' }}>Operational Score</span>
+                    <span className="badge-status badge-orange">Live Velocity</span>
                   </div>
 
                   {/* Interactive Semicircle Arc */}
