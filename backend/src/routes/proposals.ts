@@ -92,9 +92,10 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // List all proposals for dashboard
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const proposals = await getAllProposals();
+    const creatorId = req.query.creator_id as string | undefined;
+    const proposals = await getAllProposals(creatorId);
     res.json({ proposals });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

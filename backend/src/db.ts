@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import path from 'path';
 import fs from 'fs';
-import { Client, Proposal, LineItem, Invoice } from './types';
+import { Client, Proposal, LineItem, Invoice, Creator } from './types';
 
 const isPostgres = Boolean(process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres'));
 
@@ -9,13 +9,36 @@ let pgPool: Pool | null = null;
 const jsonDbPath = path.resolve(__dirname, '..', 'data', 'store.json');
 
 interface SchemaData {
+  creators: Creator[];
   clients: Client[];
   proposals: Proposal[];
   line_items: LineItem[];
   invoices: Invoice[];
 }
 
+const DEFAULT_CREATORS: Creator[] = [
+  {
+    id: 'cr_alex_rivera',
+    name: 'Alex Rivera',
+    email: 'alex@apexcut.studio',
+    studio_name: 'Apex Cut Creative Studio',
+    currency: 'USD',
+    api_key: 'stl_live_alex_9a82b1',
+    plan: 'Pro',
+  },
+  {
+    id: 'cr_elena_vance',
+    name: 'Elena Vance',
+    email: 'elena@vancefilms.io',
+    studio_name: 'Vance Motion Works',
+    currency: 'USD',
+    api_key: 'stl_live_elena_7c34d9',
+    plan: 'Pro',
+  },
+];
+
 let localData: SchemaData = {
+  creators: DEFAULT_CREATORS,
   clients: [],
   proposals: [],
   line_items: [],
@@ -194,14 +217,20 @@ export async function createProposal(
   return (await getProposalBySlug(proposal.slug))!;
 }
 
+export async function getCreatorById(id: string): Promise<Creator | null> {
+  return DEFAULT_CREATORS.find(c => c.id === id) || DEFAULT_CREATORS[0];
+}
+
 export async function getProposalBySlug(slug: string): Promise<Proposal | null> {
   if (isPostgres && pgPool) {
     const res = await pgPool.query(`SELECT * FROM proposals WHERE slug = $1`, [slug]);
     if (!res.rows[0]) return null;
     const prop = res.rows[0] as Proposal;
     const client = await getClientById(prop.client_id);
+    const creator = await getCreatorById(prop.creator_id || 'cr_alex_rivera');
     const itemsRes = await pgPool.query(`SELECT * FROM line_items WHERE proposal_id = $1`, [prop.id]);
     prop.client = client || undefined;
+    prop.creator = creator || undefined;
     prop.line_items = itemsRes.rows as LineItem[];
     return prop;
   }
@@ -209,17 +238,26 @@ export async function getProposalBySlug(slug: string): Promise<Proposal | null> 
   const prop = localData.proposals.find(p => p.slug === slug);
   if (!prop) return null;
   const client = localData.clients.find(c => c.id === prop.client_id);
+  const creator = await getCreatorById(prop.creator_id || 'cr_alex_rivera');
   const items = localData.line_items.filter(i => i.proposal_id === prop.id);
   return {
     ...prop,
     client: client || undefined,
+    creator: creator || undefined,
     line_items: items,
   };
 }
 
-export async function getAllProposals(): Promise<Proposal[]> {
+export async function getAllProposals(creator_id?: string): Promise<Proposal[]> {
   if (isPostgres && pgPool) {
-    const res = await pgPool.query(`SELECT * FROM proposals ORDER BY created_at DESC`);
+    let q = `SELECT * FROM proposals`;
+    let params: any[] = [];
+    if (creator_id) {
+      q += ` WHERE creator_id = $1`;
+      params.push(creator_id);
+    }
+    q += ` ORDER BY created_at DESC`;
+    const res = await pgPool.query(q, params);
     const proposals: Proposal[] = [];
     for (const p of res.rows) {
       const full = await getProposalBySlug(p.slug);
@@ -228,9 +266,15 @@ export async function getAllProposals(): Promise<Proposal[]> {
     return proposals;
   }
 
-  return localData.proposals.map(p => ({
+  let list = localData.proposals;
+  if (creator_id) {
+    list = list.filter(p => !p.creator_id || p.creator_id === creator_id);
+  }
+
+  return list.map(p => ({
     ...p,
     client: localData.clients.find(c => c.id === p.client_id),
+    creator: DEFAULT_CREATORS.find(c => c.id === (p.creator_id || 'cr_alex_rivera')) || DEFAULT_CREATORS[0],
     line_items: localData.line_items.filter(i => i.proposal_id === p.id),
   }));
 }

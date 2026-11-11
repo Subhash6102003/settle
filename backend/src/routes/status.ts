@@ -4,9 +4,10 @@ import { getAllProposals, getAllInvoices } from '../db';
 const router = Router();
 
 // get_status() - lists open proposals and overdue/unpaid invoices
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
-    const proposals = await getAllProposals();
+    const creatorId = req.query.creator_id as string | undefined;
+    const proposals = await getAllProposals(creatorId);
     const invoices = await getAllInvoices();
 
     const openProposals = proposals.filter(p => p.status !== 'PAID');

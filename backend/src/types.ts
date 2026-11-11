@@ -1,5 +1,16 @@
+export interface Creator {
+  id: string;
+  name: string;
+  email: string;
+  studio_name: string;
+  currency: string;
+  api_key: string;
+  plan: 'Free' | 'Pro';
+}
+
 export interface Client {
   id: string;
+  creator_id?: string;
   name: string;
   email: string;
   currency: string;
@@ -18,6 +29,7 @@ export interface LineItem {
 export interface Proposal {
   id: string;
   slug: string;
+  creator_id?: string;
   client_id: string;
   title: string;
   body: string;
@@ -31,6 +43,7 @@ export interface Proposal {
   created_at?: string;
   updated_at?: string;
   client?: Client;
+  creator?: Creator;
   line_items?: LineItem[];
 }
 
