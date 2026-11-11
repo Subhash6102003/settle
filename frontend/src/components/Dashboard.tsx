@@ -4,8 +4,10 @@ import {
   updateProposal,
   Creator,
   getActiveCreator,
+  setActiveCreator,
   API_BASE
 } from '../api';
+import { TOP_CURRENCIES, getCurrencySymbol } from '../currencies';
 import {
   FileText,
   DollarSign,
@@ -103,13 +105,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const [newTitle, setNewTitle] = useState('');
   const [newClientId, setNewClientId] = useState('');
   const [newBody, setNewBody] = useState('');
-  const [newTotal, setNewTotal] = useState(3000);
+  const [newTotal, setNewTotal] = useState(50000);
+  const [newCurrency, setNewCurrency] = useState(activeCreator.currency || 'INR');
   const [newTurnaround, setNewTurnaround] = useState(14);
   const [newRevisions, setNewRevisions] = useState(2);
 
   // New client form state
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [clientCurrency, setClientCurrency] = useState(activeCreator.currency || 'INR');
 
   const gaugeRef = useRef<SVGCircleElement>(null);
 
@@ -237,14 +241,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const handleCreateProposal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const cur = creator || getActiveCreator();
       const res = await fetch(`${API_BASE}/api/proposals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: newClientId || clients[0]?.id || 'cli_partner_1042',
-          creator_id: activeCreator.id,
+          client_id: newClientId || clients[0]?.id || `cli_${cur.id}`,
+          creator_id: cur.id,
           title: newTitle,
           body: newBody,
+          currency: newCurrency || creatorProfile.currency || 'INR',
           line_items: [
             { description: 'Primary Commercial Production Deliverable', quantity: 1, unit_price: Number(newTotal), amount: Number(newTotal) },
           ],
@@ -270,14 +276,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
   const handleCreateClient = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const cur = creator || getActiveCreator();
       const res = await fetch(`${API_BASE}/api/clients`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: clientName,
           email: clientEmail,
-          currency: activeCreator.currency || 'USD',
-          creator_id: activeCreator.id,
+          currency: clientCurrency || creatorProfile.currency || 'INR',
+          creator_id: cur.id,
         }),
       });
 
@@ -288,6 +295,41 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
       loadData();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      const cur = creator || getActiveCreator();
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: cur.id,
+          currency: creatorProfile.currency,
+          studio_name: creatorProfile.studioName,
+          name: creatorProfile.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update studio profile');
+
+      const updated = {
+        ...cur,
+        currency: creatorProfile.currency,
+        studio_name: creatorProfile.studioName,
+        name: creatorProfile.name,
+      };
+      setActiveCreator(updated);
+      setNewCurrency(creatorProfile.currency);
+      setClientCurrency(creatorProfile.currency);
+      setShowProfileModal(false);
+      setReminderToast(`Studio primary currency switched to ${creatorProfile.currency} (${getCurrencySymbol(creatorProfile.currency)})`);
+      setTimeout(() => setReminderToast(null), 3000);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || 'Failed to save profile');
     }
   };
 
@@ -576,7 +618,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <TrendingUp size={16} color="#ff5c00" />
                 </div>
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-                  ${summary ? Number(summary.pipeline_value).toLocaleString() : '0'}
+                  {getCurrencySymbol(creatorProfile.currency)}{summary ? Number(summary.pipeline_value).toLocaleString() : '0'}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: summary && summary.pipeline_value > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
                   {summary && summary.pipeline_value > 0
@@ -591,7 +633,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <DollarSign size={16} color="#ff5c00" />
                 </div>
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#ff5c00', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-                  ${summary ? Number(summary.collected_deposits).toLocaleString() : '0'}
+                  {getCurrencySymbol(creatorProfile.currency)}{summary ? Number(summary.collected_deposits).toLocaleString() : '0'}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: summary && summary.collected_deposits > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
                   {summary && summary.collected_deposits > 0
@@ -621,7 +663,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   <Award size={16} color="#ff5c00" />
                 </div>
                 <div className="tabular-nums" style={{ fontSize: '2rem', fontWeight: 800, color: '#0f172a', marginTop: '0.5rem', marginBottom: '0.25rem' }}>
-                  ${avgContractScope.toLocaleString()}
+                  {getCurrencySymbol(creatorProfile.currency)}{avgContractScope.toLocaleString()}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: avgContractScope > 0 ? '#10b981' : '#94a3b8', fontWeight: 600 }}>
                   {avgContractScope > 0
@@ -844,10 +886,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                             </span>
                           </td>
                           <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>
-                            ${Number(p.total_amount).toLocaleString()}
+                            {getCurrencySymbol(p.currency || creatorProfile.currency)}{Number(p.total_amount).toLocaleString()}
                           </td>
                           <td className="tabular-nums" style={{ padding: '1rem', textAlign: 'right', color: isPaid ? '#10b981' : '#ff5c00', fontWeight: 700 }}>
-                            ${Number(p.deposit_amount).toLocaleString()}
+                            {getCurrencySymbol(p.currency || creatorProfile.currency)}{Number(p.deposit_amount).toLocaleString()}
                           </td>
                           <td style={{ padding: '1rem', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', gap: '0.5rem' }}>
@@ -1067,6 +1109,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </div>
               </div>
 
+              {/* Primary Settlement Currency Selector */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#334155', marginBottom: '0.35rem' }}>
+                  Studio Settlement Currency ({TOP_CURRENCIES.length} Global Currencies A–Z)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <DollarSign size={15} color="#ff5c00" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                  <select
+                    value={creatorProfile.currency}
+                    onChange={e => setCreatorProfile({ ...creatorProfile, currency: e.target.value })}
+                    className="input-clean"
+                    style={{ paddingLeft: '2rem', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    {TOP_CURRENCIES.map(c => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} - {c.name} ({c.symbol}) • {c.country}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Stripe Payment & Payout Routing Details */}
               <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
@@ -1079,7 +1143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.8rem', color: '#64748b' }}>
                   <div>Stripe Account ID: <strong style={{ color: '#0f172a' }}>{creatorProfile.stripeAccountId}</strong></div>
-                  <div>Settlement Currency: <strong style={{ color: '#0f172a' }}>{creatorProfile.currency} ($)</strong></div>
+                  <div>Settlement Currency: <strong style={{ color: '#ff5c00' }}>{creatorProfile.currency} ({getCurrencySymbol(creatorProfile.currency)})</strong></div>
                   <div>Bank Payout: <strong style={{ color: '#0f172a' }}>{creatorProfile.bankRouting}</strong></div>
                   <div>Tax EIN / ID: <strong style={{ color: '#0f172a' }}>{creatorProfile.taxId}</strong></div>
                 </div>
@@ -1105,13 +1169,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 Close
               </button>
               <button
-                onClick={() => {
-                  alert('Profile & payout credentials saved successfully!');
-                  setShowProfileModal(false);
-                }}
+                onClick={handleSaveProfile}
                 className="btn-orange"
               >
-                Save Profile
+                Save Profile & Currency
               </button>
             </div>
           </div>
@@ -1185,7 +1246,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
-                    Total Price ($)
+                    Total Price ({getCurrencySymbol(editingProposal?.currency || creatorProfile.currency)})
                   </label>
                   <input
                     type="number"
@@ -1268,10 +1329,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 />
               </div>
 
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
+                  Billing & Settlement Currency
+                </label>
+                <select
+                  value={newCurrency}
+                  onChange={e => setNewCurrency(e.target.value)}
+                  className="input-clean"
+                  style={{ background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  {TOP_CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} - {c.name} ({c.symbol}) • {c.country}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
-                    Total Price ($)
+                    Total Price ({getCurrencySymbol(newCurrency)})
                   </label>
                   <input
                     type="number"
@@ -1347,7 +1426,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 />
               </div>
 
-              <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
                   Partner Billing Email
                 </label>
@@ -1359,6 +1438,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   className="input-clean"
                   required
                 />
+              </div>
+
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.4rem' }}>
+                  Preferred Billing Currency
+                </label>
+                <select
+                  value={clientCurrency}
+                  onChange={e => setClientCurrency(e.target.value)}
+                  className="input-clean"
+                  style={{ background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  {TOP_CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} - {c.name} ({c.symbol}) • {c.country}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllCreators, createCreator, getCreatorByEmail, getCreatorById } from '../db';
+import { getAllCreators, createCreator, getCreatorByEmail, getCreatorById, updateCreator } from '../db';
 import { nanoid } from 'nanoid';
 
 const router = Router();
@@ -107,6 +107,27 @@ router.get('/me', async (req: Request, res: Response) => {
 
     const creator = await getCreatorById(creatorId);
     res.json({ creator: creator || (await getAllCreators())[0] });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update creator profile (including currency, studio name, name)
+router.patch('/profile', async (req: Request, res: Response) => {
+  try {
+    const { id, currency, studio_name, name } = req.body;
+    if (!id) {
+      return res.status(400).json({ error: 'Creator ID is required' });
+    }
+    const updated = await updateCreator(id, {
+      ...(currency ? { currency } : {}),
+      ...(studio_name ? { studio_name } : {}),
+      ...(name ? { name } : {}),
+    });
+    if (!updated) {
+      return res.status(404).json({ error: 'Creator not found' });
+    }
+    res.json({ success: true, creator: updated });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -9,7 +9,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const API_BASE_URL = process.env.SETTLE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.SETTLE_API_URL || 'https://settle-dbck.onrender.com';
+const SETTLE_API_KEY = process.env.SETTLE_API_KEY || '';
+
+function getHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    ...(SETTLE_API_KEY ? { 'Authorization': `Bearer ${SETTLE_API_KEY}`, 'x-api-key': SETTLE_API_KEY } : {}),
+  };
+}
 
 const server = new Server(
   {
@@ -129,7 +137,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'add_client': {
         const res = await fetch(`${API_BASE_URL}/api/clients`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify(args),
         });
         const data = await res.json();
@@ -146,7 +154,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'create_proposal': {
         const res = await fetch(`${API_BASE_URL}/api/proposals`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify(args),
         });
         const data = await res.json();
@@ -163,7 +171,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'create_invoice': {
         const res = await fetch(`${API_BASE_URL}/api/invoices`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
           body: JSON.stringify(args),
         });
         const data = await res.json();
@@ -171,14 +179,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `Invoice #${data.invoice?.id} created!\n\nPayment Link: ${data.payment_link}\nAmount: $${data.invoice?.amount}\nStatus: ${data.invoice?.status}`,
+              text: `Invoice #${data.invoice?.id} created!\n\nPayment Link: ${data.payment_link}\nAmount: ${data.invoice?.currency || '$'}${data.invoice?.amount}\nStatus: ${data.invoice?.status}`,
             },
           ],
         };
       }
 
       case 'get_status': {
-        const res = await fetch(`${API_BASE_URL}/api/status`);
+        const res = await fetch(`${API_BASE_URL}/api/status`, {
+          headers: getHeaders(),
+        });
         const data = await res.json();
         return {
           content: [
@@ -194,7 +204,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const invoiceId = (args as any).invoice_id;
         const res = await fetch(`${API_BASE_URL}/api/invoices/${invoiceId}/reminder`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getHeaders(),
         });
         const data = await res.json();
         return {

@@ -341,6 +341,50 @@ export async function createCreator(creator: Creator): Promise<Creator> {
   return creator;
 }
 
+export async function updateCreator(id: string, updates: Partial<Creator>): Promise<Creator | null> {
+  if (isPostgres && pgPool) {
+    try {
+      const fields: string[] = [];
+      const values: any[] = [];
+      let idx = 1;
+      for (const [key, val] of Object.entries(updates)) {
+        if (['name', 'email', 'studio_name', 'currency', 'plan'].includes(key)) {
+          fields.push(`${key} = $${idx++}`);
+          values.push(val);
+        }
+      }
+      if (fields.length > 0) {
+        values.push(id);
+        await pgPool.query(`UPDATE creators SET ${fields.join(', ')} WHERE id = $${idx}`, values);
+      }
+      return getCreatorById(id);
+    } catch (err: any) {
+      console.warn('[DB] PG updateCreator failed, falling back:', err.message);
+    }
+  }
+
+  const index = localData.creators.findIndex(c => c.id === id);
+  if (index === -1) return null;
+  localData.creators[index] = {
+    ...localData.creators[index],
+    ...updates,
+  };
+  saveLocalData();
+  return localData.creators[index];
+}
+
+export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null> {
+  if (isPostgres && pgPool) {
+    try {
+      const res = await pgPool.query(`SELECT * FROM creators WHERE api_key = $1`, [apiKey]);
+      if (res.rows[0]) return res.rows[0] as Creator;
+    } catch (err: any) {
+      console.warn('[DB] PG getCreatorByApiKey failed, falling back:', err.message);
+    }
+  }
+  return localData.creators.find(c => c.api_key === apiKey) || null;
+}
+
 export async function getProposalBySlug(slug: string): Promise<Proposal | null> {
   if (isPostgres && pgPool) {
     try {

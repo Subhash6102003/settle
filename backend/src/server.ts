@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import { initDb, getAllProposals, createClient, createProposal } from './db';
+import { initDb, getAllProposals, createClient, createProposal, getCreatorByApiKey } from './db';
 import clientsRouter from './routes/clients';
 import proposalsRouter from './routes/proposals';
 import invoicesRouter from './routes/invoices';
@@ -18,12 +18,33 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
 
 // Raw body parser for Stripe webhooks, JSON parser for standard APIs
 app.use(['/api/webhooks', '/webhooks'], express.raw({ type: 'application/json' }));
 app.use(express.json());
+
+// API Key & MCP Creator Context Middleware
+app.use(async (req: any, _res, next) => {
+  try {
+    const auth = req.headers.authorization;
+    const apiKey = (req.headers['x-api-key'] as string) || (auth && auth.startsWith('Bearer stl_live_') ? auth.replace('Bearer ', '').trim() : null);
+    if (apiKey) {
+      const creator = await getCreatorByApiKey(apiKey);
+      if (creator) {
+        req.creator = creator;
+        if (req.method === 'GET' && !req.query.creator_id) {
+          req.query.creator_id = creator.id;
+        }
+        if (['POST', 'PATCH', 'PUT'].includes(req.method) && req.body && typeof req.body === 'object' && !req.body.creator_id) {
+          req.body.creator_id = creator.id;
+        }
+      }
+    }
+  } catch {}
+  next();
+});
 
 // API Routes (mounted with and without /api prefix for universal proxy compatibility)
 app.use(['/api/auth', '/auth'], authRouter);

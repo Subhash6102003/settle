@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createProposal, getProposalBySlug, getAllProposals, updateProposal, getClientById } from '../db';
+import { createProposal, getProposalBySlug, getAllProposals, updateProposal, getClientById, getCreatorById } from '../db';
 import { createDepositCheckoutSession } from '../stripe';
 import { nanoid } from 'nanoid';
 
@@ -40,7 +40,9 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(404).json({ error: `Client ${client_id} not found` });
     }
 
-    const propCurrency = currency || client.currency || 'USD';
+    const resolvedCreatorId = (req as any).creator_id || creator_id || client.creator_id || 'cr_alex_rivera';
+    const creator = resolvedCreatorId ? await getCreatorById(resolvedCreatorId) : null;
+    const propCurrency = currency || (creator && creator.currency) || client.currency || 'INR';
 
     // Calculate line items total
     let total = 0;
@@ -65,7 +67,7 @@ router.post('/', async (req: Request, res: Response) => {
       {
         id: proposalId,
         slug,
-        creator_id: creator_id || client.creator_id || 'cr_alex_rivera',
+        creator_id: resolvedCreatorId,
         client_id,
         title,
         body,

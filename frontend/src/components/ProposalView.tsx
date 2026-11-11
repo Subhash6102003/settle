@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Proposal, fetchProposalBySlug, createCheckout } from '../api';
+import { getCurrencySymbol } from '../currencies';
 import {
   CheckCircle2,
   Clock,
@@ -102,6 +103,8 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
   });
 
   const receiptNumber = `REC-2026-${proposal.slug.replace(/[^a-zA-Z0-9]/g, '').slice(-6).toUpperCase()}`;
+  const sym = getCurrencySymbol(proposal.currency || 'INR');
+  const currencyCode = (proposal.currency || 'INR').toUpperCase();
 
   return (
     <div style={{ minHeight: '100vh', padding: '2.5rem 1.5rem', background: '#f8f9fb', fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif" }}>
@@ -266,34 +269,34 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
                     Due on Signing
                   </td>
                   <td className="tabular-nums" style={{ padding: '1rem 0', textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
-                    ${Number(proposal.deposit_amount).toLocaleString()}.00
+                    {sym}{Number(proposal.deposit_amount).toLocaleString()}.00
                   </td>
                 </tr>
               </tbody>
             </table>
 
             {/* Financial Totals Calculation Box */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-end', marginBottom: '2rem' }}>
               <div style={{ width: '320px', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>
                   <span>Total Project Scope:</span>
-                  <span className="tabular-nums" style={{ color: '#0f172a', fontWeight: 600 }}>${Number(proposal.total_amount).toLocaleString()}.00</span>
+                  <span className="tabular-nums" style={{ color: '#0f172a', fontWeight: 600 }}>{sym}{Number(proposal.total_amount).toLocaleString()}.00</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>
                   <span>Deposit Required (50%):</span>
-                  <span className="tabular-nums" style={{ color: '#0f172a', fontWeight: 600 }}>${Number(proposal.deposit_amount).toLocaleString()}.00</span>
+                  <span className="tabular-nums" style={{ color: '#0f172a', fontWeight: 600 }}>{sym}{Number(proposal.deposit_amount).toLocaleString()}.00</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
                   <span>Taxes & Gateway Fees:</span>
-                  <span className="tabular-nums" style={{ color: '#10b981', fontWeight: 600 }}>$0.00 (Covered)</span>
+                  <span className="tabular-nums" style={{ color: '#10b981', fontWeight: 600 }}>{sym}0.00 (Covered)</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.15rem', fontWeight: 800, color: '#0f172a', borderTop: '2px solid #0f172a', paddingTop: '0.75rem' }}>
-                  <span>Total Paid (USD):</span>
-                  <span className="tabular-nums" style={{ color: '#ff5c00' }}>${Number(proposal.deposit_amount).toLocaleString()}.00</span>
+                  <span>Total Paid ({currencyCode}):</span>
+                  <span className="tabular-nums" style={{ color: '#ff5c00' }}>{sym}{Number(proposal.deposit_amount).toLocaleString()}.00</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', color: '#64748b', marginTop: '0.75rem', background: '#f8fafc', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
                   <span>Balance Due on Delivery:</span>
-                  <span className="tabular-nums" style={{ fontWeight: 700, color: '#0f172a' }}>${(Number(proposal.total_amount) - Number(proposal.deposit_amount)).toLocaleString()}.00</span>
+                  <span className="tabular-nums" style={{ fontWeight: 700, color: '#0f172a' }}>{sym}{(Number(proposal.total_amount) - Number(proposal.deposit_amount)).toLocaleString()}.00</span>
                 </div>
               </div>
             </div>
@@ -353,10 +356,10 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
                     Total Project Scope
                   </div>
                   <div className="tabular-nums" style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', marginTop: '0.1rem' }}>
-                    ${Number(proposal.total_amount).toLocaleString()}
+                    {sym}{Number(proposal.total_amount).toLocaleString()}
                   </div>
                   <div style={{ color: '#ff5c00', fontSize: '0.8rem', fontWeight: 600, marginTop: '0.1rem' }}>
-                    50% Deposit: ${Number(proposal.deposit_amount).toLocaleString()}
+                    50% Deposit: {sym}{Number(proposal.deposit_amount).toLocaleString()}
                   </div>
                 </div>
               </div>
@@ -420,10 +423,10 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
                           {item.quantity}
                         </td>
                         <td className="tabular-nums" style={{ padding: '0.9rem 1rem', textAlign: 'right', color: '#64748b' }}>
-                          ${Number(item.unit_price).toLocaleString()}
+                          {sym}{Number(item.unit_price).toLocaleString()}
                         </td>
                         <td className="tabular-nums" style={{ padding: '0.9rem 1rem', textAlign: 'right', color: '#0f172a', fontWeight: 700 }}>
-                          ${Number(item.amount).toLocaleString()}
+                          {sym}{Number(item.amount).toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -454,7 +457,7 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
                   </div>
                 </div>
                 <div className="tabular-nums" style={{ color: '#ff5c00', fontWeight: 800, fontSize: '1.6rem' }}>
-                  ${Number(proposal.deposit_amount).toLocaleString()}
+                  {sym}{Number(proposal.deposit_amount).toLocaleString()}
                 </div>
               </div>
 
@@ -475,7 +478,7 @@ export const ProposalView: React.FC<ProposalViewProps> = ({ slug }) => {
                     className="btn-orange"
                     style={{ minWidth: '240px', padding: '0.75rem 1.5rem', fontSize: '0.92rem' }}
                   >
-                    {paying ? 'Redirecting to Stripe...' : `Accept Scope & Pay $${Number(proposal.deposit_amount).toLocaleString()}`}
+                    {paying ? 'Redirecting to Stripe...' : `Accept Scope & Pay ${sym}${Number(proposal.deposit_amount).toLocaleString()}`}
                     <ArrowRight size={16} />
                   </button>
                 )}

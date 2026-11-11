@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Creator, setActiveCreator, API_BASE } from '../api';
-import { ArrowRight, Lock, Mail, Building, User } from 'lucide-react';
+import { ArrowRight, Lock, Mail, Building, User, DollarSign } from 'lucide-react';
+import { TOP_CURRENCIES } from '../currencies';
 
 interface AuthScreenProps {
   onLoginSuccess: (creator: Creator, token: string) => void;
@@ -12,6 +13,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [studioName, setStudioName] = useState('');
+  const [currency, setCurrency] = useState('INR');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +25,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     try {
       const endpoint = isRegister ? `${API_BASE}/api/auth/register` : `${API_BASE}/api/auth/login`;
       const body = isRegister
-        ? { name, email, password, studio_name: studioName, currency: 'USD' }
+        ? { name, email, password, studio_name: studioName, currency: currency || 'INR' }
         : { email, password };
 
       const res = await fetch(endpoint, {
@@ -138,6 +140,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
                       style={{ paddingLeft: '2rem' }}
                       required
                     />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#334155', marginBottom: '0.35rem' }}>
+                    Primary Studio Currency ({TOP_CURRENCIES.length} Available A–Z)
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <DollarSign size={15} color="#ff5c00" style={{ position: 'absolute', left: '10px', top: '12px' }} />
+                    <select
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value)}
+                      className="input-clean"
+                      style={{ paddingLeft: '2rem', background: '#fff', cursor: 'pointer' }}
+                    >
+                      {TOP_CURRENCIES.map(c => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} - {c.name} ({c.symbol}) • {c.country}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </>
