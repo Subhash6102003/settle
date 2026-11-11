@@ -2,6 +2,7 @@ export interface Creator {
   id: string;
   name: string;
   email: string;
+  password_hash?: string;
   studio_name: string;
   currency: string;
   api_key: string;

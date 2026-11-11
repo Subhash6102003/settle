@@ -9,6 +9,7 @@ import proposalsRouter from './routes/proposals';
 import invoicesRouter from './routes/invoices';
 import statusRouter from './routes/status';
 import webhooksRouter from './routes/webhooks';
+import authRouter from './routes/auth';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +26,7 @@ app.use('/api/webhooks', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 // API Routes
+app.use('/api/auth', authRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/proposals', proposalsRouter);
 app.use('/api/invoices', invoicesRouter);

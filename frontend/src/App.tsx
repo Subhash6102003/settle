@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { ProposalView } from './components/ProposalView';
+import { AuthScreen } from './components/AuthScreen';
+import { Creator, getActiveCreator } from './api';
 
 export const App: React.FC = () => {
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('settle_auth_token'));
+  const [_creator, setCreator] = useState<Creator | null>(getActiveCreator());
 
   useEffect(() => {
     const handlePopState = () => {
@@ -13,14 +17,30 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Route: /p/:slug
+  const handleLoginSuccess = (user: Creator, token: string) => {
+    setCreator(user);
+    setAuthToken(token);
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('settle_auth_token');
+    setAuthToken(null);
+    setCreator(null);
+  };
+
+  // Route 1: Public Client Proposal & Receipt View (/p/:slug)
   if (currentPath.startsWith('/p/')) {
     const slug = currentPath.replace('/p/', '').split('/')[0].split('?')[0];
     return <ProposalView slug={slug} />;
   }
 
-  // Default: Dashboard
-  return <Dashboard />;
+  // Route 2: Creator Authentication Gate (If not logged in, show AuthScreen)
+  if (!authToken) {
+    return <AuthScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // Route 3: Authenticated Multi-Tenant Creator Studio
+  return <Dashboard onSignOut={handleSignOut} />;
 };
 
 export default App;

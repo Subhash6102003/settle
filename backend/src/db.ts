@@ -49,7 +49,15 @@ function loadLocalData(): void {
   try {
     if (fs.existsSync(jsonDbPath)) {
       const raw = fs.readFileSync(jsonDbPath, 'utf-8');
-      localData = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      localData = {
+        creators: parsed.creators && parsed.creators.length > 0 ? parsed.creators : DEFAULT_CREATORS,
+        clients: parsed.clients || [],
+        proposals: parsed.proposals || [],
+        line_items: parsed.line_items || [],
+        invoices: parsed.invoices || [],
+      };
+      saveLocalData();
     } else {
       saveLocalData();
     }
@@ -218,7 +226,41 @@ export async function createProposal(
 }
 
 export async function getCreatorById(id: string): Promise<Creator | null> {
-  return DEFAULT_CREATORS.find(c => c.id === id) || DEFAULT_CREATORS[0];
+  if (isPostgres && pgPool) {
+    const res = await pgPool.query(`SELECT * FROM creators WHERE id = $1`, [id]);
+    return (res.rows[0] as Creator) || null;
+  }
+  return localData.creators.find(c => c.id === id) || localData.creators[0] || null;
+}
+
+export async function getCreatorByEmail(email: string): Promise<Creator | null> {
+  if (isPostgres && pgPool) {
+    const res = await pgPool.query(`SELECT * FROM creators WHERE email = $1`, [email]);
+    return (res.rows[0] as Creator) || null;
+  }
+  return localData.creators.find(c => c.email.toLowerCase() === email.toLowerCase()) || null;
+}
+
+export async function getAllCreators(): Promise<Creator[]> {
+  if (isPostgres && pgPool) {
+    const res = await pgPool.query(`SELECT * FROM creators ORDER BY created_at ASC`);
+    return res.rows as Creator[];
+  }
+  return [...localData.creators];
+}
+
+export async function createCreator(creator: Creator): Promise<Creator> {
+  if (isPostgres && pgPool) {
+    await pgPool.query(
+      `INSERT INTO creators (id, name, email, password_hash, studio_name, currency, api_key, plan)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [creator.id, creator.name, creator.email, (creator as any).password_hash || '', creator.studio_name, creator.currency || 'USD', creator.api_key, creator.plan || 'Pro']
+    );
+    return creator;
+  }
+  localData.creators.push(creator);
+  saveLocalData();
+  return creator;
 }
 
 export async function getProposalBySlug(slug: string): Promise<Proposal | null> {
