@@ -6,10 +6,10 @@ import {
   TrendingUp,
   Edit3,
   ExternalLink,
-  Terminal,
   X,
   RefreshCw,
-  Video
+  Video,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Dashboard: React.FC = () => {
@@ -17,7 +17,6 @@ export const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editingProposal, setEditingProposal] = useState<Proposal | null>(null);
-  const [copiedPrompt, setCopiedPrompt] = useState(false);
 
   // Edit form state
   const [editTitle, setEditTitle] = useState('');
@@ -40,7 +39,7 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // 5s telemetry polling
+    const interval = setInterval(loadData, 3000); // 3s real-time sync with MCP
     return () => clearInterval(interval);
   }, []);
 
@@ -73,19 +72,6 @@ export const Dashboard: React.FC = () => {
     }
   };
 
-  const samplePrompt = `Draft a commercial video editing proposal for Acme Studio:
-- Project: 3-week product launch brand refresh
-- Total: $4,800 with 50% upfront deposit ($2,400)
-- Deliverables: 1x 90s commercial hero, 3x 30s TikTok/Reels vertical cuts, color grade, Dolby sound mix
-- Turnaround: 14 business days, 2 revision passes included.
-Call Settle create_proposal and provide the public link.`;
-
-  const copyPromptToClipboard = () => {
-    navigator.clipboard.writeText(samplePrompt);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
-
   return (
     <div style={{ minHeight: '100vh', background: '#0b0d10', padding: '2.5rem 1.5rem' }}>
       <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
@@ -97,31 +83,31 @@ Call Settle create_proposal and provide the public link.`;
               <Video size={20} color="#00e599" />
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <span style={{ fontWeight: 700, fontSize: '1.25rem' }}>Settle</span>
-                <span style={{ fontSize: '0.7rem', background: '#1c212a', color: '#00e599', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600, border: '1px solid rgba(0, 229, 153, 0.2)' }}>
-                  ZERO AI INSIDE
+                <span style={{ fontSize: '0.7rem', background: '#181c24', color: '#00e599', padding: '0.2rem 0.55rem', borderRadius: '4px', fontWeight: 600, border: '1px solid rgba(0, 229, 153, 0.2)', letterSpacing: '0.05em' }}>
+                  OPERATIONS CONSOLE
                 </span>
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#626b7c' }}>
-                Powered by Claude over MCP Protocol • Stripe Test Rails
+              <div style={{ fontSize: '0.8rem', color: '#626b7c', marginTop: '0.15rem' }}>
+                Headless Commercial Ledger • Connected via MCP • Stripe Rails
               </div>
             </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button onClick={loadData} className="btn-secondary" style={{ padding: '0.5rem 0.85rem' }}>
-              <RefreshCw size={14} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#13161c', padding: '0.45rem 0.85rem', borderRadius: '6px', border: '1px solid #222733', fontSize: '0.8rem', color: '#9aa2b1' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00e599', boxShadow: '0 0 8px #00e599' }} />
+              MCP Gateway Active
+            </div>
+            <button onClick={loadData} className="btn-secondary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.85rem' }}>
+              <RefreshCw size={13} />
               Sync
-            </button>
-            <button onClick={copyPromptToClipboard} className="btn-primary" style={{ padding: '0.5rem 0.95rem', fontSize: '0.85rem' }}>
-              <Terminal size={14} />
-              {copiedPrompt ? 'Prompt Copied!' : 'Copy Claude Prompt'}
             </button>
           </div>
         </div>
 
-        {/* Financial Telemetry Metrics */}
+        {/* Financial Ledger Metrics */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem', marginBottom: '2.5rem' }}>
           
           <div style={{ background: '#13161c', border: '1px solid #222733', borderRadius: '12px', padding: '1.5rem' }}>
@@ -133,7 +119,7 @@ Call Settle create_proposal and provide the public link.`;
               ${summary ? Number(summary.pipeline_value).toLocaleString() : '0'}
             </div>
             <div style={{ color: '#626b7c', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-              {summary ? summary.total_open_proposals : 0} open proposals sent
+              {summary ? summary.total_open_proposals : 0} open scopes pending acceptance
             </div>
           </div>
 
@@ -146,20 +132,20 @@ Call Settle create_proposal and provide the public link.`;
               ${summary ? Number(summary.collected_deposits).toLocaleString() : '0'}
             </div>
             <div style={{ color: '#626b7c', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-              {summary ? summary.total_accepted_proposals : 0} proposals accepted & locked
+              {summary ? summary.total_accepted_proposals : 0} production schedules confirmed
             </div>
           </div>
 
           <div style={{ background: '#13161c', border: '1px solid #222733', borderRadius: '12px', padding: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <span style={{ color: '#9aa2b1', fontSize: '0.85rem', fontWeight: 500 }}>Claude MCP Status</span>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#00e599', boxShadow: '0 0 10px #00e599' }} />
+              <span style={{ color: '#9aa2b1', fontSize: '0.85rem', fontWeight: 500 }}>Architecture Compliance</span>
+              <ShieldCheck size={18} color="#00e599" />
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#f0f3f8' }}>
-              Ready for Prompts
+            <div style={{ fontSize: '1.15rem', fontWeight: 600, color: '#f0f3f8' }}>
+              Zero AI Inside App
             </div>
             <div style={{ color: '#626b7c', fontSize: '0.8rem', marginTop: '0.4rem' }}>
-              5 MCP tools exposed via Stdio
+              $0 Inference Cost • External Claude Brain
             </div>
           </div>
 
@@ -167,11 +153,11 @@ Call Settle create_proposal and provide the public link.`;
 
         {/* Proposals Table */}
         <div style={{ background: '#13161c', border: '1px solid #222733', borderRadius: '16px', padding: '1.75rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Proposals & Milestones</h2>
               <p style={{ color: '#9aa2b1', fontSize: '0.85rem' }}>
-                Created via Claude Desktop. Editable in-place with instant Stripe checkout.
+                Dispatched from Claude via MCP. Editable in-place with instant client payment links.
               </p>
             </div>
           </div>
@@ -183,9 +169,9 @@ Call Settle create_proposal and provide the public link.`;
           ) : proposals.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', background: '#0b0d10', borderRadius: '10px', border: '1px dashed #222733' }}>
               <FileText size={32} color="#626b7c" style={{ margin: '0 auto 0.75rem' }} />
-              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No proposals yet</div>
-              <p style={{ color: '#626b7c', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto 1rem' }}>
-                Open Claude Desktop, paste your client brief, and say "Settle this" to create your first proposal.
+              <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>No active proposals</div>
+              <p style={{ color: '#626b7c', fontSize: '0.85rem', maxWidth: '380px', margin: '0 auto' }}>
+                Prompt Claude Desktop to draft a proposal. The MCP server will commit the new scope to this ledger in real-time.
               </p>
             </div>
           ) : (
@@ -193,12 +179,12 @@ Call Settle create_proposal and provide the public link.`;
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #222733', color: '#626b7c', textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.05em' }}>
-                    <th style={{ padding: '0.75rem 1rem' }}>Proposal Title</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Scope & Deliverables</th>
                     <th style={{ padding: '0.75rem 1rem' }}>Client</th>
-                    <th style={{ padding: '0.75rem 1rem' }}>Status</th>
+                    <th style={{ padding: '0.75rem 1rem' }}>Milestone Status</th>
                     <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Total</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Deposit (50%)</th>
-                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Actions</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Upfront Deposit</th>
+                    <th style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>Human Review</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,8 +194,8 @@ Call Settle create_proposal and provide the public link.`;
                       <tr key={p.id} style={{ borderBottom: '1px solid #1a1e27', transition: 'background 150ms ease' }}>
                         <td style={{ padding: '1rem', fontWeight: 600, color: '#f0f3f8' }}>
                           <div>{p.title}</div>
-                          <div style={{ fontSize: '0.75rem', color: '#626b7c', fontWeight: 400 }}>
-                            {p.turnaround_days}d turnaround • {p.revisions_included} revisions
+                          <div style={{ fontSize: '0.75rem', color: '#626b7c', fontWeight: 400, marginTop: '0.2rem' }}>
+                            {p.turnaround_days}d turnaround • {p.revisions_included} revisions included
                           </div>
                         </td>
                         <td style={{ padding: '1rem', color: '#9aa2b1' }}>
@@ -233,7 +219,7 @@ Call Settle create_proposal and provide the public link.`;
                               onClick={() => handleOpenEdit(p)}
                               className="btn-secondary"
                               style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                              title="Edit proposal details in app"
+                              title="Human review and override terms"
                             >
                               <Edit3 size={13} />
                               Edit
@@ -244,10 +230,10 @@ Call Settle create_proposal and provide the public link.`;
                               rel="noreferrer"
                               className="btn-secondary"
                               style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
-                              title="Open public proposal client view"
+                              title="Open public client payment link"
                             >
                               <ExternalLink size={13} />
-                              View
+                              Client Page
                             </a>
                           </div>
                         </td>
@@ -265,7 +251,10 @@ Call Settle create_proposal and provide the public link.`;
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', zIndex: 50 }}>
             <div style={{ background: '#13161c', border: '1px solid #222733', borderRadius: '16px', maxWidth: '580px', width: '100%', padding: '2rem', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Human In-the-Loop Override</h3>
+                <div>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Human In-the-Loop Override</h3>
+                  <p style={{ color: '#626b7c', fontSize: '0.8rem' }}>Modify any deliverable, price, or revision clause Claude committed.</p>
+                </div>
                 <button onClick={() => setEditingProposal(null)} style={{ background: 'none', border: 'none', color: '#9aa2b1', cursor: 'pointer' }}>
                   <X size={20} />
                 </button>
