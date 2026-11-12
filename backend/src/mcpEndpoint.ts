@@ -376,7 +376,12 @@ async function handleToolExecution(name: string, a: any, creator: Creator) {
 }
 
 function sendJson(res: Response, statusCode: number, data: any) {
-  return res.status(statusCode).json(data);
+  const payload = Buffer.from(JSON.stringify(data), 'utf-8');
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': payload.length,
+  });
+  return res.end(payload);
 }
 
 function createMcpServerInstance(creator: Creator): Server {
