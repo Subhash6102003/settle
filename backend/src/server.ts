@@ -15,12 +15,14 @@ import { setupMcpRoutes } from './mcpEndpoint';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS for frontend and Claude Desktop
+// Enable CORS for all frontends (production, preview branches, and localhost)
 app.use(cors({
-  origin: '*',
+  origin: true,
+  credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
 }));
+app.options('*', cors());
 
 // Raw body parser for Stripe webhooks, JSON parser for standard APIs
 app.use(['/api/webhooks', '/webhooks'], express.raw({ type: 'application/json' }));
