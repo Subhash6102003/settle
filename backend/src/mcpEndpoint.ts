@@ -14,6 +14,7 @@ import {
   createInvoice,
   getAllInvoices,
   getCreatorByApiKey,
+  getCreatorByEmail,
   getCreatorById,
   createCreator,
   updateCreator,
@@ -408,16 +409,43 @@ async function resolveCreatorFromReq(req: Request): Promise<Creator | null> {
   const apiKey =
     (req.query.key as string) ||
     (req.query.apiKey as string) ||
+    (req.query.api_key as string) ||
     (req.headers['x-api-key'] as string) ||
     (auth && auth.startsWith('Bearer ') ? auth.replace('Bearer ', '').trim() : null);
 
+  const emailParam =
+    (req.query.email as string) ||
+    (req.query.creator_email as string) ||
+    (req.headers['x-creator-email'] as string);
+
+  // 1. Direct Email binding (e.g. /mcp?email=Subhashmaurya6102003@gmail.com)
+  if (emailParam) {
+    const cleanEmail = emailParam.toLowerCase().trim();
+    const creatorByEmail = await getCreatorByEmail(cleanEmail);
+    if (creatorByEmail) return creatorByEmail;
+
+    // Auto-provision an isolated studio account tied to this exact email
+    const studioName = (req.query.studio as string) || 'RKM Developments';
+    const newStudio = await createCreator({
+      id: `cr_${nanoid(10)}`,
+      name: cleanEmail.split('@')[0],
+      email: cleanEmail,
+      password_hash: 'demo_pass',
+      studio_name: studioName,
+      currency: 'INR',
+      api_key: `stl_live_${nanoid(16)}`,
+      plan: 'Pro',
+      description: 'Custom software engineering studio specializing in high-performance web applications, desktop tools, and local LLM integrations.',
+    });
+    console.log(`[MCP] Auto-provisioned isolated studio for email ${cleanEmail}: ${newStudio.id}`);
+    return newStudio;
+  }
+
+  // 2. Direct API Key binding (e.g. /mcp?key=stl_live_...)
   if (apiKey) {
     const creator = await getCreatorByApiKey(apiKey);
     if (creator) return creator;
 
-    // Real MCP Client Isolation:
-    // If an API key is provided, NEVER fall back to demo account Alex Rivera!
-    // Auto-provision a clean, isolated studio account tied to this API key.
     if (apiKey.startsWith('stl_live_')) {
       const studioName = (req.query.studio as string) || 'My Creator Studio';
       const newLiveCreator = await createCreator({

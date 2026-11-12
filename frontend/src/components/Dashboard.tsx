@@ -181,86 +181,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
       let liveClients = clientRes?.clients || [];
       let liveSummary = statRes?.summary || null;
 
-      // Resilient fallback during Render free-tier cold-start so demo never shows blank $0
-      if (liveProposals.length === 0) {
-        if (cur.id === 'cr_alex_rivera') {
-          liveProposals = [
-            {
-              id: 'prop_demo_alex_1',
-              slug: 'acme-brands-commercial-motion-suite',
-              creator_id: 'cr_alex_rivera',
-              client_id: 'cli_acme_brands',
-              title: 'Commercial Video Post-Production & Motion Package',
-              body: 'Hero commercial master, vertical 9:16 social cutdowns, color grading and Dolby Atmos sound design.',
-              status: 'SENT',
-              total_amount: 4800,
-              deposit_amount: 2400,
-              deposit_paid: 0,
-              currency: 'USD',
-              turnaround_days: 14,
-              revisions_included: 2,
-              created_at: new Date().toISOString()
-            }
-          ];
-          liveClients = [
-            { id: 'cli_acme_brands', name: 'Acme Brands Inc.', email: 'ap@acmebrand.com', company: 'Acme Brands', currency: 'USD' }
-          ];
-          liveSummary = {
-            studio: 'Apex Cut Creative Studio',
+      // Resilient fallback only for demo sandbox account (Alex Rivera) during Render cold-start
+      if (liveProposals.length === 0 && cur.id === 'cr_alex_rivera') {
+        liveProposals = [
+          {
+            id: 'prop_demo_alex_1',
+            slug: 'acme-brands-commercial-motion-suite',
+            creator_id: 'cr_alex_rivera',
+            client_id: 'cli_acme_brands',
+            title: 'Commercial Video Post-Production & Motion Package',
+            body: 'Hero commercial master, vertical 9:16 social cutdowns, color grading and Dolby Atmos sound design.',
+            status: 'SENT',
+            total_amount: 4800,
+            deposit_amount: 2400,
+            deposit_paid: 0,
             currency: 'USD',
-            partners_count: 1,
-            active_proposals_count: 1,
-            pipeline_total: 4800,
-            deposits_cleared_total: 0,
-            proposals_settled_count: 0,
-            outstanding_invoices_count: 0
-          };
-        } else if (cur.id === 'cr_rkm_dev' || cur.email?.includes('rkm') || cur.email?.includes('subhash')) {
-          liveProposals = [
-            {
-              id: 'prop_subhash_code_editor',
-              slug: 'subhash-custom-ai-code-editor',
-              creator_id: 'cr_rkm_dev',
-              client_id: 'cli_subhash_maurya',
-              title: 'Custom Desktop AI Code Editor & Offline Local LLM Runtime Engine',
-              body: 'Custom desktop code editor engineered with React 19, Electron.js, and Monaco Editor core, integrated with an on-device local LLM execution runtime (Ollama / Llama.cpp).',
-              status: 'ACCEPTED',
-              total_amount: 180000,
-              deposit_amount: 90000,
-              deposit_paid: 0,
-              currency: 'INR',
-              turnaround_days: 30,
-              revisions_included: 3,
-              created_at: new Date().toISOString()
-            }
-          ];
-          liveInvoices = [
-            {
-              id: 'inv_subhash_code_editor',
-              creator_id: 'cr_rkm_dev',
-              client_id: 'cli_subhash_maurya',
-              proposal_id: 'prop_subhash_code_editor',
-              amount: 180000,
-              currency: 'INR',
-              due_date: 'November 26, 2026',
-              status: 'UNPAID',
-              created_at: new Date().toISOString()
-            }
-          ];
-          liveClients = [
-            { id: 'cli_subhash_maurya', name: 'Subhash Maurya', email: 'subhashmaurya6102003@gmail.com', company: 'Maurya Software Labs', currency: 'INR' }
-          ];
-          liveSummary = {
-            studio: 'RKM Developments',
-            currency: 'INR',
-            partners_count: 1,
-            active_proposals_count: 1,
-            pipeline_total: 180000,
-            deposits_cleared_total: 0,
-            proposals_settled_count: 0,
-            outstanding_invoices_count: 1
-          };
-        }
+            turnaround_days: 14,
+            revisions_included: 2,
+            created_at: new Date().toISOString()
+          }
+        ];
+        liveClients = [
+          { id: 'cli_acme_brands', name: 'Acme Brands Inc.', email: 'ap@acmebrand.com', company: 'Acme Brands', currency: 'USD' }
+        ];
+        liveSummary = {
+          studio: 'Apex Cut Creative Studio',
+          currency: 'USD',
+          partners_count: 1,
+          active_proposals_count: 1,
+          pipeline_total: 4800,
+          deposits_cleared_total: 0,
+          proposals_settled_count: 0,
+          outstanding_invoices_count: 0
+        };
       }
 
       setProposals(liveProposals);
@@ -582,6 +535,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
+  const browserEmailMcpUrl = `${API_BASE}/mcp?email=${encodeURIComponent(activeCreator.email || '')}`;
   const browserMcpUrl = `${API_BASE}/mcp?key=${activeCreator.api_key}`;
   const browserSseUrl = `${API_BASE}/sse?key=${activeCreator.api_key}`;
   const desktopConfigJson = JSON.stringify({
@@ -1940,26 +1894,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                     </code>
                   </div>
 
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#ff5c00', textTransform: 'uppercase' }}>
+                        2. Direct Email-Bound MCP URL (Guaranteed Account Isolation)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(browserEmailMcpUrl);
+                          setReminderToast('Copied Email-Bound MCP URL');
+                          setTimeout(() => setReminderToast(null), 2000);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                      >
+                        Copy Email MCP URL
+                      </button>
+                    </div>
+                    <code style={{ fontSize: '0.78rem', color: '#0f172a', background: '#fff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'block', wordBreak: 'break-all', lineHeight: 1.4 }}>
+                      {browserEmailMcpUrl}
+                    </code>
+                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.3rem' }}>
+                      🔒 Binds Claude directly to <strong>{activeCreator.email}</strong>. Every proposal, invoice, and milestone created by Claude is isolated strictly to this account.
+                    </p>
+                  </div>
+
                   <div style={{ marginBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#ff5c00', textTransform: 'uppercase' }}>
-                        2. Recommended Universal MCP URL (Streamable HTTP)
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>
+                        3. Studio Key MCP URL
                       </span>
                       <button
                         type="button"
                         onClick={copyBrowserUrl}
-                        style={{ background: 'none', border: 'none', color: '#ff5c00', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                        style={{ background: 'none', border: 'none', color: '#475569', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                       >
                         {copiedMcpUrl ? <Check size={14} /> : null}
-                        {copiedMcpUrl ? 'Copied!' : 'Copy Streamable URL'}
+                        {copiedMcpUrl ? 'Copied!' : 'Copy Key URL'}
                       </button>
                     </div>
                     <code style={{ fontSize: '0.78rem', color: '#0f172a', background: '#fff', padding: '0.5rem 0.65rem', borderRadius: '6px', border: '1px solid #cbd5e1', display: 'block', wordBreak: 'break-all', lineHeight: 1.4 }}>
                       {browserMcpUrl}
                     </code>
-                    <p style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '0.3rem' }}>
-                      ✨ Streamable HTTP is the universal, modern transport for real-time tool calling without timeout warnings.
-                    </p>
                   </div>
 
                   <div>

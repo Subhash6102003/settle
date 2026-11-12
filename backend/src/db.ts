@@ -253,7 +253,7 @@ export async function getAllClients(creator_id?: string): Promise<Client[]> {
       }
       q += ` ORDER BY created_at DESC`;
       const res = await pgPool.query(q, params);
-      if (res.rows.length > 0) return res.rows as Client[];
+      return res.rows as Client[];
     } catch (err: any) {
       console.warn('[DB] PG getAllClients failed, falling back:', err.message);
     }
@@ -333,15 +333,16 @@ export async function getCreatorById(id: string): Promise<Creator | null> {
 }
 
 export async function getCreatorByEmail(email: string): Promise<Creator | null> {
+  const cleanEmail = email.toLowerCase().trim();
   if (isPostgres && pgPool) {
     try {
-      const res = await pgPool.query(`SELECT * FROM creators WHERE email = $1`, [email]);
+      const res = await pgPool.query(`SELECT * FROM creators WHERE LOWER(TRIM(email)) = $1`, [cleanEmail]);
       if (res.rows[0]) return res.rows[0] as Creator;
     } catch (err: any) {
       console.warn('[DB] PG getCreatorByEmail failed, falling back:', err.message);
     }
   }
-  return localData.creators.find(c => c.email.toLowerCase() === email.toLowerCase()) || null;
+  return localData.creators.find(c => c.email.toLowerCase().trim() === cleanEmail) || null;
 }
 
 export async function getAllCreators(): Promise<Creator[]> {
@@ -543,7 +544,7 @@ export async function getAllProposals(creator_id?: string): Promise<Proposal[]> 
         const full = await getProposalBySlug(p.slug);
         if (full) proposals.push(full);
       }
-      if (proposals.length > 0) return proposals;
+      return proposals;
     } catch (err: any) {
       console.warn('[DB] PG getAllProposals failed, falling back:', err.message);
     }
@@ -679,7 +680,7 @@ export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
         const client = await getClientById(inv.client_id);
         invoices.push({ ...inv, client: client || undefined });
       }
-      if (invoices.length > 0) return invoices;
+      return invoices;
     } catch (err: any) {
       console.warn('[DB] PG getAllInvoices failed, falling back:', err.message);
     }

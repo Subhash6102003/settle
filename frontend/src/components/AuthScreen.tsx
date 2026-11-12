@@ -69,28 +69,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    if (!isRegister && (lowerEmail.includes('rkm') || lowerEmail.includes('subhash'))) {
-      const demoCreator: Creator = {
-        id: 'cr_rkm_dev',
-        name: 'RKM Developments',
-        email: 'rkm6@gmail.com',
-        studio_name: 'RKM Developments',
-        currency: 'INR',
-        api_key: 'stl_live_ivqzKZFnoyL05uuh',
-        plan: 'Pro',
-        description: 'Custom software engineering studio specializing in high-performance desktop applications, React 19 architecture, Electron runtimes, local offline LLM integrations, and autonomous code diff engines.',
-        phone: '+91 8109128509',
-        website: 'https://rkmdevelopments.in',
-        address: 'Tech Park, Sector 4, Bangalore & Central Hub, India',
-        tax_id: 'GSTIN-29AAACR1234M1Z5',
-      };
-      setActiveCreator(demoCreator);
-      localStorage.setItem('settle_auth_token', 'stl_demo_token_rkm');
-      onLoginSuccess(demoCreator, 'stl_demo_token_rkm');
-      setLoading(false);
-      return;
-    }
-
     try {
       const endpoint = isRegister ? `${API_BASE}/api/auth/register` : `${API_BASE}/api/auth/login`;
       const body = isRegister
