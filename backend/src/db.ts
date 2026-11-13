@@ -301,44 +301,13 @@ export async function createProposal(
   proposal: Proposal,
   items: Omit<LineItem, 'id' | 'proposal_id'>[]
 ): Promise<Proposal> {
-  if (isPostgres && pgPool) {
-    try {
-      await pgPool.query(
-        `INSERT INTO proposals (id, slug, client_id, title, body, status, total_amount, deposit_amount, deposit_paid, currency, revisions_included, turnaround_days)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-        [
-          proposal.id,
-          proposal.slug,
-          proposal.client_id,
-          proposal.title,
-          proposal.body,
-          proposal.status || 'SENT',
-          proposal.total_amount,
-          proposal.deposit_amount,
-          proposal.deposit_paid || 0,
-          proposal.currency || 'USD',
-          proposal.revisions_included || 2,
-          proposal.turnaround_days || 14,
-        ]
-      );
-
-      for (const item of items) {
-        const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-        await pgPool.query(
-          `INSERT INTO line_items (id, proposal_id, description, quantity, unit_price, amount) VALUES ($1, $2, $3, $4, $5, $6)`,
-          [itemId, proposal.id, item.description, item.quantity, item.unit_price, item.amount]
-        );
-      }
-
-      const created = await getProposalBySlug(proposal.slug);
-      if (created) return created;
-    } catch (err: any) {
-      console.warn('[DB] PG createProposal failed, falling back:', err.message);
-    }
+  const existingIdx = localData.proposals.findIndex(p => p.id === proposal.id || p.slug === proposal.slug);
+  if (existingIdx >= 0) {
+    localData.proposals[existingIdx] = proposal;
+  } else {
+    localData.proposals.push(proposal);
   }
 
-  // Local fallback
-  localData.proposals.push(proposal);
   for (const item of items) {
     const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     localData.line_items.push({
@@ -348,7 +317,47 @@ export async function createProposal(
     });
   }
   saveLocalData();
-  return (await getProposalBySlug(proposal.slug))!;
+
+  if (isPostgres && pgPool) {
+    try {
+      await pgPool.query(
+        `INSERT INTO proposals (id, slug, creator_id, client_id, title, body, status, total_amount, deposit_amount, deposit_paid, currency, revisions_included, turnaround_days)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, total_amount = EXCLUDED.total_amount, deposit_amount = EXCLUDED.deposit_amount`,
+        [
+          proposal.id,
+          proposal.slug,
+          proposal.creator_id || null,
+          proposal.client_id,
+          proposal.title,
+          proposal.body,
+          proposal.status || 'SENT',
+          proposal.total_amount,
+          proposal.deposit_amount,
+          proposal.deposit_paid || 0,
+          proposal.currency || 'INR',
+          proposal.revisions_included || 2,
+          proposal.turnaround_days || 14,
+        ]
+      );
+
+      for (const item of items) {
+        const itemId = `item_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+        await pgPool.query(
+          `INSERT INTO line_items (id, proposal_id, description, quantity, unit_price, amount) VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO NOTHING`,
+          [itemId, proposal.id, item.description, item.quantity, item.unit_price, item.amount]
+        );
+      }
+
+      const created = await getProposalBySlug(proposal.slug);
+      if (created) return created;
+    } catch (err: any) {
+      console.warn('[DB] PG createProposal failed, kept in local store:', err.message);
+    }
+  }
+
+  return (await getProposalBySlug(proposal.slug)) || proposal;
 }
 
 export async function getCreatorById(id: string): Promise<Creator | null> {
@@ -567,30 +576,35 @@ export async function getProposalBySlug(slug: string): Promise<Proposal | null> 
 }
 
 export async function getAllProposals(creator_id?: string): Promise<Proposal[]> {
+  const targetId = (creator_id === 'cr_subhash_maurya' || creator_id === 'cr_rkm_dev') ? 'cr_jM6U3UuVEB' : creator_id;
   if (isPostgres && pgPool) {
     try {
-      let q = `SELECT * FROM proposals`;
+      let q = `SELECT p.* FROM proposals p LEFT JOIN clients c ON p.client_id = c.id`;
       let params: any[] = [];
-      if (creator_id) {
-        q += ` WHERE creator_id = $1`;
-        params.push(creator_id);
+      if (targetId) {
+        q += ` WHERE (p.creator_id = $1 OR c.creator_id = $1)`;
+        params.push(targetId);
       }
-      q += ` ORDER BY created_at DESC`;
+      q += ` ORDER BY p.created_at DESC`;
       const res = await pgPool.query(q, params);
       const proposals: Proposal[] = [];
       for (const p of res.rows) {
         const full = await getProposalBySlug(p.slug);
         if (full) proposals.push(full);
       }
-      return proposals;
+      if (proposals.length > 0) return proposals;
     } catch (err: any) {
       console.warn('[DB] PG getAllProposals failed, falling back:', err.message);
     }
   }
 
   let list = localData.proposals;
-  if (creator_id) {
-    list = list.filter(p => p.creator_id === creator_id);
+  if (targetId) {
+    list = list.filter(p => {
+      if (p.creator_id === targetId) return true;
+      const c = localData.clients.find(cl => cl.id === p.client_id);
+      return c && c.creator_id === targetId;
+    });
   }
 
   return list.map(p => ({

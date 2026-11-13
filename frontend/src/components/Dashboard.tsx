@@ -330,17 +330,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
     e.preventDefault();
     try {
       const cur = creator || getActiveCreator();
+      const targetClientId = newClientId || clients[0]?.id || 'cli_OIlb5Rpp';
       const res = await fetch(`${API_BASE}/api/proposals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: newClientId || clients[0]?.id || `cli_${cur.id}`,
+          client_id: targetClientId,
           creator_id: cur.id,
           title: newTitle,
           body: newBody,
           currency: newCurrency || creatorProfile.currency || 'INR',
           line_items: [
-            { description: 'Primary Commercial Production Deliverable', quantity: 1, unit_price: Number(newTotal), amount: Number(newTotal) },
+            { description: newTitle || 'Primary Commercial Deliverable', quantity: 1, unit_price: Number(newTotal), amount: Number(newTotal) },
           ],
           turnaround_days: Number(newTurnaround),
           revisions_included: Number(newRevisions),
@@ -351,13 +352,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create proposal');
 
+      if (data.proposal) {
+        setProposals(prev => [data.proposal, ...prev.filter(p => p.id !== data.proposal.id)]);
+      }
+
       setShowNewProposalModal(false);
       setNewTitle('');
       setNewBody('');
-      loadData();
-      alert(`Proposal created successfully!\nPublic Link: ${data.public_link}`);
+      await loadData();
     } catch (err: any) {
-      alert(err.message);
+      alert(err.message || 'Error creating proposal');
     }
   };
 
@@ -796,7 +800,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
             </button>
             <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
               <Plus size={15} />
-              New Proposal
+              Create Proposal
             </button>
           </div>
         </div>
@@ -1039,7 +1043,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                 </p>
                 <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button onClick={() => setShowNewProposalModal(true)} className="btn-orange">
-                    + Create First Proposal
+                    <Plus size={15} style={{ marginRight: '0.4rem', display: 'inline' }} />
+                    Create Proposal
                   </button>
                   <button onClick={handleSeedDemoProposal} className="btn-ghost" style={{ border: '1px solid #cbd5e1' }}>
                     ⚡ Load Sample Video Package
@@ -1623,14 +1628,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   Partner Account
                 </label>
                 <select
-                  value={newClientId}
+                  value={newClientId || (clients[0]?.id || 'cli_OIlb5Rpp')}
                   onChange={e => setNewClientId(e.target.value)}
                   className="input-clean"
                   required
                 >
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>Partner #{c.id.slice(-4).toUpperCase()}</option>
-                  ))}
+                  {clients.length > 0 ? (
+                    clients.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name || c.company || 'Partner'} ({c.email || 'billing@partner.com'})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="cli_OIlb5Rpp">Infosys Limited (ap@infosys.com)</option>
+                  )}
                 </select>
               </div>
 
@@ -1708,7 +1719,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
                   Cancel
                 </button>
                 <button type="submit" className="btn-orange">
-                  Publish Proposal & Link
+                  <Plus size={15} style={{ marginRight: '0.4rem', display: 'inline' }} />
+                  Create Proposal
                 </button>
               </div>
             </form>

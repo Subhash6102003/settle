@@ -136,6 +136,35 @@ async function initializeBackend() {
       console.log('[SEED] Demo client and proposal auto-seeded.');
     }
 
+    // Auto-seed RKM Developments / Subhash Maurya proposal for Infosys Limited
+    const rkmProposals = await getAllProposals('cr_jM6U3UuVEB');
+    if (rkmProposals.length === 0) {
+      await createProposal(
+        {
+          id: 'prop_infosys_code_editor',
+          slug: 'infosys-ai-code-editor-suite-2026',
+          creator_id: 'cr_jM6U3UuVEB',
+          client_id: 'cli_OIlb5Rpp',
+          title: 'AI Code Editor Desktop Application + Offline LLM Integration Suite',
+          body: `Complete software engineering architecture, Electron.js desktop IDE core, Monaco code editor AST bindings, and offline local LLM runtime engine for Infosys engineering teams.\n\nDeliverables:\n- 1x Cross-Platform Desktop IDE with Monaco AST & multi-tab buffer management\n- 1x Offline Local LLM Runtime Engine (Native Ollama / Llama.cpp bridge with zero cloud latency)\n- 1x Autonomous Code Generation & Diff Streaming Engine\n- 1x Model Context Protocol (MCP) Extension Bus & Production Packaging\n\nCommercial Milestones:\n- 50% Upfront Milestone Deposit (₹2,50,000) to lock architecture sprint\n- 50% Settlement upon UAT signoff and binary distribution`,
+          status: 'SENT',
+          total_amount: 500000,
+          deposit_amount: 250000,
+          deposit_paid: 0,
+          currency: 'INR',
+          revisions_included: 3,
+          turnaround_days: 21,
+        },
+        [
+          { description: 'Electron.js & React 19 Cross-Platform Desktop IDE Architecture', quantity: 1, unit_price: 150000, amount: 150000 },
+          { description: 'Monaco Code Editor Core, Syntax Highlighting & Diff Viewer', quantity: 1, unit_price: 100000, amount: 100000 },
+          { description: 'Offline Local LLM Runtime Engine & Quantization Bridge', quantity: 1, unit_price: 150000, amount: 150000 },
+          { description: 'MCP Extension Bus, Testing Suite & Signed Production Installers', quantity: 1, unit_price: 100000, amount: 100000 },
+        ]
+      );
+      console.log('[SEED] RKM Developments proposal auto-seeded.');
+    }
+
     const existingInvoices = await getAllInvoices();
     if (existingInvoices.length === 0 || !existingInvoices.some(i => i.id === 'inv__ZKOYjGr')) {
       // Ensure Infosys client exists for Subhash / RKM Developments

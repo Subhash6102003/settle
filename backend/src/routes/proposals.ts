@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createProposal, getProposalBySlug, getAllProposals, updateProposal, getClientById, getCreatorById } from '../db';
+import { createProposal, getProposalBySlug, getAllProposals, updateProposal, getClientById, getCreatorById, createClient } from '../db';
 import { createDepositCheckoutSession } from '../stripe';
 import { nanoid } from 'nanoid';
 
@@ -31,18 +31,25 @@ router.post('/', async (req: Request, res: Response) => {
       slug: customSlug,
     } = req.body;
 
-    if (!client_id || !title || !body) {
-      return res.status(400).json({ error: 'client_id, title, and body are required' });
+    if (!title || !body) {
+      return res.status(400).json({ error: 'title and body are required' });
     }
 
-    const client = await getClientById(client_id);
-    if (!client) {
-      return res.status(404).json({ error: `Client ${client_id} not found` });
-    }
-
-    const resolvedCreatorId = (req as any).creator_id || creator_id || client.creator_id || 'cr_alex_rivera';
+    const resolvedCreatorId = (req as any).creator?.id || creator_id || 'cr_jM6U3UuVEB';
     const creator = resolvedCreatorId ? await getCreatorById(resolvedCreatorId) : null;
-    const propCurrency = currency || (creator && creator.currency) || client.currency || 'INR';
+    const propCurrency = currency || (creator && creator.currency) || 'INR';
+
+    let client = client_id ? await getClientById(client_id) : null;
+    if (!client) {
+      client = await createClient({
+        id: (client_id && client_id.startsWith('cli_')) ? client_id : `cli_${nanoid(8)}`,
+        creator_id: resolvedCreatorId,
+        name: req.body.client_name || 'Infosys Limited',
+        email: req.body.client_email || 'ap@infosys.com',
+        company: req.body.client_company || 'Infosys Limited',
+        currency: propCurrency,
+      });
+    }
 
     // Calculate line items total
     let total = 0;
