@@ -16,13 +16,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Enable CORS for all frontends (production, preview branches, and localhost)
-app.use(cors({
+const corsOptions = {
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
-}));
-app.options('*', cors());
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Raw body parser for Stripe webhooks, JSON parser for standard APIs
 app.use(['/api/webhooks', '/webhooks'], express.raw({ type: 'application/json' }));

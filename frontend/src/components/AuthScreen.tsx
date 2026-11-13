@@ -25,6 +25,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
     const lowerEmail = email.toLowerCase().trim();
 
     // Instant zero-latency authentication for demo studios (no network delay or cold-start risk)
+    if (!isRegister && (lowerEmail.includes('subhash') || lowerEmail.includes('rkm') || lowerEmail.includes('6102003'))) {
+      const demoCreator: Creator = {
+        id: 'cr_jM6U3UuVEB',
+        name: 'Subhash Maurya',
+        email: 'rkm6102003@gmail.com',
+        studio_name: 'RKM Developments',
+        currency: 'INR',
+        api_key: 'stl_live_I13EbVlgh78RS68t',
+        plan: 'Pro',
+        description: 'Custom software engineering studio specializing in high-performance web applications, desktop tools, and local LLM integrations.',
+        phone: '+91 98765 43210',
+        website: 'https://settle-blond.vercel.app',
+        address: 'Bengaluru, Karnataka, India',
+        tax_id: 'IN-GST-29AAAAA0000A1Z5',
+      };
+      setActiveCreator(demoCreator);
+      localStorage.setItem('settle_auth_token', 'stl_demo_token_rkm');
+      onLoginSuccess(demoCreator, 'stl_demo_token_rkm');
+      setLoading(false);
+      return;
+    }
+
     if (!isRegister && (lowerEmail.includes('alex') || lowerEmail.includes('apex') || lowerEmail === 'demo@settle.io')) {
       const demoCreator: Creator = {
         id: 'cr_alex_rivera',
@@ -112,37 +134,57 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
   const handleDemoLogin = (creatorId: string) => {
     setLoading(true);
     setError(null);
-    const creator: Creator = creatorId === 'cr_alex_rivera' ? {
-      id: 'cr_alex_rivera',
-      name: 'Alex Rivera',
-      email: 'alex@apexcut.studio',
-      studio_name: 'Apex Cut Creative Studio',
-      currency: 'USD',
-      api_key: 'stl_live_alex_9a82b1',
-      plan: 'Pro',
-      description: 'High-end commercial video post-production, 4K HDR color mastering, and broadcast motion design.',
-      phone: '+1 (555) 382-9104',
-      website: 'https://apexcut.studio',
-      address: '1088 Sansome St, Suite 400, San Francisco, CA 94111',
-      tax_id: 'US-EIN-84-2910492',
-    } : {
-      id: 'cr_elena_vance',
-      name: 'Elena Vance',
-      email: 'elena@vancefilms.io',
-      studio_name: 'Vance Motion Works',
-      currency: 'USD',
-      api_key: 'stl_live_elena_7c34d9',
-      plan: 'Pro',
-      description: 'Boutique cinematic visual effects, sound design, and 3D product animation.',
-      phone: '+1 (555) 749-2041',
-      website: 'https://vancefilms.io',
-      address: '420 W 14th St, New York, NY 10014',
-      tax_id: 'US-EIN-13-9481023',
-    };
+    let creator: Creator;
+    if (creatorId === 'cr_jM6U3UuVEB' || creatorId.includes('subhash') || creatorId.includes('rkm')) {
+      creator = {
+        id: 'cr_jM6U3UuVEB',
+        name: 'Subhash Maurya',
+        email: 'rkm6102003@gmail.com',
+        studio_name: 'RKM Developments',
+        currency: 'INR',
+        api_key: 'stl_live_I13EbVlgh78RS68t',
+        plan: 'Pro',
+        description: 'Custom software engineering studio specializing in high-performance web applications, desktop tools, and local LLM integrations.',
+        phone: '+91 98765 43210',
+        website: 'https://settle-blond.vercel.app',
+        address: 'Bengaluru, Karnataka, India',
+        tax_id: 'IN-GST-29AAAAA0000A1Z5',
+      };
+    } else if (creatorId === 'cr_alex_rivera') {
+      creator = {
+        id: 'cr_alex_rivera',
+        name: 'Alex Rivera',
+        email: 'alex@apexcut.studio',
+        studio_name: 'Apex Cut Creative Studio',
+        currency: 'USD',
+        api_key: 'stl_live_alex_9a82b1',
+        plan: 'Pro',
+        description: 'High-end commercial video post-production, 4K HDR color mastering, and broadcast motion design.',
+        phone: '+1 (555) 382-9104',
+        website: 'https://apexcut.studio',
+        address: '1088 Sansome St, Suite 400, San Francisco, CA 94111',
+        tax_id: 'US-EIN-84-2910492',
+      };
+    } else {
+      creator = {
+        id: 'cr_elena_vance',
+        name: 'Elena Vance',
+        email: 'elena@vancefilms.io',
+        studio_name: 'Vance Motion Works',
+        currency: 'USD',
+        api_key: 'stl_live_elena_7c34d9',
+        plan: 'Pro',
+        description: 'Boutique cinematic visual effects, sound design, and 3D product animation.',
+        phone: '+1 (555) 749-2041',
+        website: 'https://vancefilms.io',
+        address: '420 W 14th St, New York, NY 10014',
+        tax_id: 'US-EIN-13-9481023',
+      };
+    }
 
     setActiveCreator(creator);
-    localStorage.setItem('settle_auth_token', `stl_demo_${creatorId}`);
-    onLoginSuccess(creator, `stl_demo_${creatorId}`);
+    localStorage.setItem('settle_auth_token', `stl_demo_${creator.id}`);
+    onLoginSuccess(creator, `stl_demo_${creator.id}`);
     setLoading(false);
   };
 
@@ -302,11 +344,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <button
               type="button"
+              onClick={() => handleDemoLogin('cr_jM6U3UuVEB')}
+              className="btn-ghost"
+              style={{ width: '100%', justifyContent: 'flex-start', padding: '0.65rem 0.85rem', borderColor: '#ff5c00', background: 'rgba(255,92,0,0.04)' }}
+            >
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800 }}>
+                R
+              </div>
+              <div style={{ textAlign: 'left', marginLeft: '0.5rem' }}>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a' }}>RKM Developments (Subhash Maurya)</div>
+                <div style={{ fontSize: '0.72rem', color: '#ff5c00', fontWeight: 600 }}>Connected Claude MCP Studio (INR)</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleDemoLogin('cr_alex_rivera')}
               className="btn-ghost"
               style={{ width: '100%', justifyContent: 'flex-start', padding: '0.65rem 0.85rem' }}
             >
-              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#ff5c00', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+              <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#0f172a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
                 A
               </div>
               <div style={{ textAlign: 'left', marginLeft: '0.5rem' }}>

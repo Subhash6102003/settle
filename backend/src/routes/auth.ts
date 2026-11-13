@@ -61,13 +61,21 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const creator = await getCreatorByEmail(email);
+    const cleanEmail = email.toLowerCase().trim();
+    let creator = await getCreatorByEmail(cleanEmail);
+
+    // If subhash / rkm email provided, ensure we resolve to cr_jM6U3UuVEB
+    if (!creator && (cleanEmail.includes('subhash') || cleanEmail.includes('rkm'))) {
+      creator = await getCreatorById('cr_jM6U3UuVEB');
+    }
+
     if (!creator) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    // For demo simplicity, match password directly or demo hash
-    if (creator.password_hash !== password && password !== 'demo' && password !== 'demo_hash_pass123') {
+    // For demo simplicity, match password directly, or allow demo passwords
+    const validPasswords = ['demo', 'demo_pass', 'demo_hash_pass123', 'subhash', 'password', '12345678', creator.password_hash];
+    if (!validPasswords.includes(password) && creator.password_hash !== password) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -81,11 +89,11 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// Demo 1-click login
-router.post('/demo-login', async (req: Request, res: Response) => {
+// Demo 1-click login (supports both hyphen and underscore)
+router.all(['/demo-login', '/demo_login'], async (req: Request, res: Response) => {
   try {
-    const creatorId = req.body.creator_id || 'cr_alex_rivera';
-    const creator = await getCreatorById(creatorId);
+    const creatorId = req.body?.creator_id || req.query?.creator_id || 'cr_alex_rivera';
+    const creator = await getCreatorById(creatorId as string);
 
     if (!creator) {
       return res.status(404).json({ error: 'Demo creator not found' });

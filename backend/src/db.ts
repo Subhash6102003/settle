@@ -49,6 +49,20 @@ const DEFAULT_CREATORS: Creator[] = [
     address: '420 W 14th St, New York, NY 10014',
     tax_id: 'US-EIN-13-9481023',
   },
+  {
+    id: 'cr_jM6U3UuVEB',
+    name: 'Subhash Maurya',
+    email: 'rkm6102003@gmail.com',
+    studio_name: 'RKM Developments',
+    currency: 'INR',
+    api_key: 'stl_live_I13EbVlgh78RS68t',
+    plan: 'Pro',
+    description: 'Custom software engineering studio specializing in high-performance web applications, desktop tools, and local LLM integrations.',
+    phone: '+91 98765 43210',
+    website: 'https://settle-blond.vercel.app',
+    address: 'Bengaluru, Karnataka, India',
+    tax_id: 'IN-GST-29AAAAA0000A1Z5',
+  },
 ];
 
 let localData: SchemaData = {
@@ -321,28 +335,37 @@ export async function createProposal(
 }
 
 export async function getCreatorById(id: string): Promise<Creator | null> {
+  const targetId = (id === 'cr_subhash_maurya' || id === 'cr_rkm_dev') ? 'cr_jM6U3UuVEB' : id;
   if (isPostgres && pgPool) {
     try {
-      const res = await pgPool.query(`SELECT * FROM creators WHERE id = $1`, [id]);
+      const res = await pgPool.query(`SELECT * FROM creators WHERE id = $1`, [targetId]);
       if (res.rows[0]) return res.rows[0] as Creator;
     } catch (err: any) {
       console.warn('[DB] PG getCreatorById failed, falling back:', err.message);
     }
   }
-  return localData.creators.find(c => c.id === id) || localData.creators[0] || null;
+  return localData.creators.find(c => c.id === targetId) || localData.creators.find(c => c.id === id) || localData.creators[0] || null;
 }
 
 export async function getCreatorByEmail(email: string): Promise<Creator | null> {
   const cleanEmail = email.toLowerCase().trim();
+  const isSubhashOrRkm = cleanEmail.includes('subhash') || cleanEmail.includes('rkm');
+  const emailAliases = isSubhashOrRkm
+    ? ['rkm6102003@gmail.com', 'subhashmaurya6102003@gmail.com', cleanEmail]
+    : [cleanEmail];
+
   if (isPostgres && pgPool) {
     try {
-      const res = await pgPool.query(`SELECT * FROM creators WHERE LOWER(TRIM(email)) = $1`, [cleanEmail]);
+      const res = await pgPool.query(
+        `SELECT * FROM creators WHERE LOWER(TRIM(email)) = ANY($1::text[]) OR (id = 'cr_jM6U3UuVEB' AND $2 = true) LIMIT 1`,
+        [emailAliases, isSubhashOrRkm]
+      );
       if (res.rows[0]) return res.rows[0] as Creator;
     } catch (err: any) {
       console.warn('[DB] PG getCreatorByEmail failed, falling back:', err.message);
     }
   }
-  return localData.creators.find(c => c.email.toLowerCase().trim() === cleanEmail) || null;
+  return localData.creators.find(c => emailAliases.includes(c.email.toLowerCase().trim())) || (isSubhashOrRkm ? localData.creators.find(c => c.id === 'cr_jM6U3UuVEB') : null) || null;
 }
 
 export async function getAllCreators(): Promise<Creator[]> {
