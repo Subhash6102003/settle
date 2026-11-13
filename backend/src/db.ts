@@ -65,12 +65,106 @@ const DEFAULT_CREATORS: Creator[] = [
   },
 ];
 
+const DEFAULT_CLIENTS: Client[] = [
+  {
+    id: 'cli_OIlb5Rpp',
+    creator_id: 'cr_jM6U3UuVEB',
+    name: 'Infosys Limited',
+    email: 'ap@infosys.com',
+    phone: '+91 80 2852 0261',
+    company: 'Infosys Limited',
+    currency: 'INR',
+  },
+  {
+    id: 'cli_acme_demo',
+    creator_id: 'cr_alex_rivera',
+    name: 'Commercial Partner #104 (Acme Brands)',
+    email: 'ap@acmebrand.com',
+    phone: '+1 (555) 902-1842',
+    company: 'Acme Brands Inc.',
+    currency: 'USD',
+  },
+];
+
+const DEFAULT_PROPOSALS: Proposal[] = [
+  {
+    id: 'prop_infosys_code_editor',
+    slug: 'infosys-ai-code-editor-suite-2026',
+    creator_id: 'cr_jM6U3UuVEB',
+    client_id: 'cli_OIlb5Rpp',
+    title: 'AI Code Editor Desktop Application + Offline LLM Integration Suite',
+    body: `Complete software engineering architecture, Electron.js desktop IDE core, Monaco code editor AST bindings, and offline local LLM runtime engine for Infosys engineering teams.\n\nDeliverables:\n- 1x Cross-Platform Desktop IDE with Monaco AST & multi-tab buffer management\n- 1x Offline Local LLM Runtime Engine (Native Ollama / Llama.cpp bridge with zero cloud latency)\n- 1x Autonomous Code Generation & Diff Streaming Engine\n- 1x Model Context Protocol (MCP) Extension Bus & Production Packaging\n\nCommercial Milestones:\n- 50% Upfront Milestone Deposit (₹2,50,000) to lock architecture sprint\n- 50% Settlement upon UAT signoff and binary distribution`,
+    status: 'SENT',
+    total_amount: 500000,
+    deposit_amount: 250000,
+    deposit_paid: 0,
+    currency: 'INR',
+    revisions_included: 3,
+    turnaround_days: 21,
+    created_at: '2026-11-13T00:00:00.000Z',
+    updated_at: '2026-11-13T00:00:00.000Z',
+  },
+  {
+    id: 'prop_brand_refresh_demo',
+    slug: 'acme-brand-refresh-2026',
+    creator_id: 'cr_alex_rivera',
+    client_id: 'cli_acme_demo',
+    title: 'Commercial Video Post-Production & Motion Package',
+    body: `Complete post-production, dynamic motion graphics, sound design, and multi-platform social cutdowns for Acme's 2026 Product Launch.`,
+    status: 'SENT',
+    total_amount: 4800,
+    deposit_amount: 2400,
+    deposit_paid: 0,
+    currency: 'USD',
+    revisions_included: 2,
+    turnaround_days: 14,
+    created_at: '2026-11-13T00:00:00.000Z',
+    updated_at: '2026-11-13T00:00:00.000Z',
+  },
+];
+
+const DEFAULT_INVOICES: Invoice[] = [
+  {
+    id: 'inv__ZKOYjGr',
+    creator_id: 'cr_jM6U3UuVEB',
+    client_id: 'cli_OIlb5Rpp',
+    amount: 250000,
+    currency: 'INR',
+    due_date: '2026-12-12',
+    status: 'UNPAID',
+    proposal_id: 'prop_infosys_code_editor',
+    created_at: '2026-11-13T00:00:00.000Z',
+  },
+  {
+    id: 'inv_subhash_code_editor',
+    creator_id: 'cr_jM6U3UuVEB',
+    client_id: 'cli_OIlb5Rpp',
+    amount: 180000,
+    currency: 'INR',
+    due_date: '2026-11-26',
+    status: 'UNPAID',
+    proposal_id: 'prop_infosys_code_editor',
+    created_at: '2026-11-13T00:00:00.000Z',
+  },
+  {
+    id: 'inv_demo_acme_deposit',
+    creator_id: 'cr_alex_rivera',
+    proposal_id: 'prop_brand_refresh_demo',
+    client_id: 'cli_acme_demo',
+    amount: 2400,
+    currency: 'USD',
+    due_date: 'Net 14 Milestone Settlement',
+    status: 'UNPAID',
+    created_at: '2026-11-13T00:00:00.000Z',
+  },
+];
+
 let localData: SchemaData = {
   creators: DEFAULT_CREATORS,
-  clients: [],
-  proposals: [],
+  clients: DEFAULT_CLIENTS,
+  proposals: DEFAULT_PROPOSALS,
   line_items: [],
-  invoices: [],
+  invoices: DEFAULT_INVOICES,
 };
 
 function loadLocalData(): void {
@@ -80,11 +174,36 @@ function loadLocalData(): void {
       const parsed = JSON.parse(raw);
       localData = {
         creators: parsed.creators && parsed.creators.length > 0 ? parsed.creators : DEFAULT_CREATORS,
-        clients: parsed.clients || [],
-        proposals: parsed.proposals || [],
+        clients: parsed.clients && parsed.clients.length > 0 ? parsed.clients : DEFAULT_CLIENTS,
+        proposals: parsed.proposals && parsed.proposals.length > 0 ? parsed.proposals : DEFAULT_PROPOSALS,
         line_items: parsed.line_items || [],
-        invoices: parsed.invoices || [],
+        invoices: parsed.invoices && parsed.invoices.length > 0 ? parsed.invoices : DEFAULT_INVOICES,
       };
+
+      for (const defInv of DEFAULT_INVOICES) {
+        if (!localData.invoices.some(i => i.id === defInv.id)) {
+          localData.invoices.push(defInv);
+        }
+      }
+      for (const defCli of DEFAULT_CLIENTS) {
+        if (!localData.clients.some(c => c.id === defCli.id)) {
+          localData.clients.push(defCli);
+        }
+      }
+      for (const defProp of DEFAULT_PROPOSALS) {
+        if (!localData.proposals.some(p => p.id === defProp.id)) {
+          localData.proposals.push(defProp);
+        }
+      }
+    } else {
+      localData = {
+        creators: [...DEFAULT_CREATORS],
+        clients: [...DEFAULT_CLIENTS],
+        proposals: [...DEFAULT_PROPOSALS],
+        line_items: [],
+        invoices: [...DEFAULT_INVOICES],
+      };
+      saveLocalData();
     }
   } catch (err) {
     console.warn('[DB] Warning loading local store:', err);
@@ -122,6 +241,12 @@ if (isPostgres) {
     console.warn('[DB] Failed to initialize PostgreSQL pool:', err.message);
     pgPool = null;
   }
+}
+
+export function isPostgresEnabled(): string {
+  if (!isPostgres) return 'no_database_url_configured';
+  if (!pgPool) return 'pool_initialization_failed';
+  return 'connected_postgresql';
 }
 
 export async function initDb(): Promise<void> {

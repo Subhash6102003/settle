@@ -74,10 +74,16 @@ app.use(['/api/webhooks', '/webhooks'], webhooksRouter);
 setupMcpRoutes(app);
 
 // Health check endpoint
-app.get(['/health', '/api/health'], (_req, res) => {
+app.get(['/health', '/api/health'], async (_req, res) => {
+  let pgStatus = 'disabled';
+  try {
+    const { isPostgresEnabled } = await import('./db');
+    pgStatus = isPostgresEnabled();
+  } catch {}
   res.json({
     status: 'healthy',
     product: 'Settle',
+    database: pgStatus,
     architecture: 'Zero AI Inside (Runs on Claude & MCP)',
     timestamp: new Date().toISOString(),
   });
