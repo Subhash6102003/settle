@@ -3,7 +3,7 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import { initDb, getAllProposals, createClient, createProposal, getCreatorByApiKey, getCreatorById } from './db';
+import { initDb, getAllProposals, createClient, createProposal, getCreatorByApiKey, getCreatorById, createInvoice, getAllInvoices } from './db';
 import clientsRouter from './routes/clients';
 import proposalsRouter from './routes/proposals';
 import invoicesRouter from './routes/invoices';
@@ -133,6 +133,31 @@ async function initializeBackend() {
         ]
       );
       console.log('[SEED] Demo client and proposal auto-seeded.');
+    }
+
+    const existingInvoices = await getAllInvoices();
+    if (existingInvoices.length === 0) {
+      await createInvoice({
+        id: 'inv_demo_acme_deposit',
+        creator_id: 'cr_alex_rivera',
+        proposal_id: 'prop_brand_refresh_demo',
+        client_id: 'cli_acme_demo',
+        amount: 2400,
+        currency: 'USD',
+        due_date: 'Net 14 Milestone Settlement',
+        status: 'UNPAID',
+      });
+
+      await createInvoice({
+        id: 'inv_subhash_code_editor',
+        creator_id: 'cr_alex_rivera',
+        client_id: 'cli_acme_demo',
+        amount: 180000,
+        currency: 'INR',
+        due_date: 'Net 14 Milestone Settlement',
+        status: 'UNPAID',
+      });
+      console.log('[SEED] Demo invoices auto-seeded.');
     }
   } catch (err: any) {
     console.warn('[INIT] Initialization warning:', err.message);

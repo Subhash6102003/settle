@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createInvoice, getAllInvoices, getClientById, getInvoiceById, getCreatorById } from '../db';
+import { createInvoice, getAllInvoices, getClientById, getInvoiceById, getCreatorById, updateInvoiceStatus } from '../db';
 import { stripe } from '../stripe';
 import { sendInvoiceReceiptEmail } from '../email';
 import { nanoid } from 'nanoid';
@@ -158,6 +158,90 @@ router.post('/:id/reminder', async (req: Request, res: Response) => {
       invoice_id: invoice.id,
       amount: invoice.amount,
       status: invoice.status,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create Stripe Checkout Session for Invoice Payment
+router.post('/:id/checkout', async (req: Request, res: Response) => {
+  try {
+    const invoice = await getInvoiceById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    if (invoice.status === 'PAID') {
+      return res.status(400).json({ error: 'Invoice has already been paid in full' });
+    }
+
+    const client = await getClientById(invoice.client_id);
+    const creator = await getCreatorById(invoice.creator_id || client?.creator_id || 'cr_alex_rivera');
+    const currency = invoice.currency || client?.currency || creator?.currency || 'USD';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://settle-blond.vercel.app';
+
+    let sessionUrl = `${frontendUrl}/invoices/${invoice.id}?payment=success`;
+    let sessionId = `cs_sim_${nanoid(16)}`;
+
+    try {
+      if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_') && process.env.STRIPE_SECRET_KEY !== 'sk_test_placeholder') {
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          mode: 'payment',
+          customer_email: client?.email && client.email.includes('@') ? client.email : undefined,
+          line_items: [
+            {
+              price_data: {
+                currency: currency.toLowerCase(),
+                product_data: {
+                  name: `Invoice #${invoice.id} - ${creator?.studio_name || 'Studio'}`,
+                  description: `Milestone settlement payment for invoice #${invoice.id}`,
+                },
+                unit_amount: Math.round(Number(invoice.amount) * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          metadata: {
+            invoiceId: invoice.id,
+            type: 'invoice_payment',
+          },
+          success_url: `${frontendUrl}/invoices/${invoice.id}?payment=success`,
+          cancel_url: `${frontendUrl}/invoices/${invoice.id}?payment=cancelled`,
+        });
+
+        sessionUrl = session.url || sessionUrl;
+        sessionId = session.id;
+      }
+    } catch (stripeErr: any) {
+      console.warn('[STRIPE] Invoice session generation fallback:', stripeErr.message);
+    }
+
+    res.json({
+      success: true,
+      checkout_url: sessionUrl,
+      session_id: sessionId,
+    });
+  } catch (err: any) {
+    console.error('Invoice checkout error:', err);
+    res.status(500).json({ error: err.message || 'Failed to create checkout session' });
+  }
+});
+
+// Mark invoice as paid (settled)
+router.post('/:id/pay', async (req: Request, res: Response) => {
+  try {
+    const invoice = await getInvoiceById(req.params.id);
+    if (!invoice) {
+      return res.status(404).json({ error: 'Invoice not found' });
+    }
+
+    const updated = await updateInvoiceStatus(invoice.id, 'PAID');
+    res.json({
+      success: true,
+      message: `Invoice #${invoice.id} marked as PAID.`,
+      invoice: updated,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

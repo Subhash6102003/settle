@@ -601,6 +601,25 @@ export async function updateProposal(id: string, updates: Partial<Proposal>): Pr
 }
 
 // Invoice operations
+export async function updateInvoiceStatus(id: string, status: 'UNPAID' | 'PAID' | 'OVERDUE'): Promise<Invoice | null> {
+  if (isPostgres && pgPool) {
+    try {
+      await pgPool.query(`UPDATE invoices SET status = $1 WHERE id = $2`, [status, id]);
+      return await getInvoiceById(id);
+    } catch (err: any) {
+      console.warn('[DB] PG updateInvoiceStatus failed, falling back:', err.message);
+    }
+  }
+
+  const invoice = localData.invoices.find(inv => inv.id === id);
+  if (invoice) {
+    invoice.status = status;
+    saveLocalData();
+    return invoice;
+  }
+  return null;
+}
+
 export async function createInvoice(invoice: Invoice): Promise<Invoice> {
   if (isPostgres && pgPool) {
     try {
