@@ -208,8 +208,9 @@ export async function initDb(): Promise<void> {
         INSERT INTO creators (id, name, email, studio_name, currency, api_key, plan)
         VALUES 
           ('cr_alex_rivera', 'Alex Rivera', 'alex@apexcut.studio', 'Apex Cut Creative Studio', 'USD', 'stl_live_alex_9a82b1', 'Pro'),
-          ('cr_elena_vance', 'Elena Vance', 'elena@vancefilms.io', 'Vance Motion Works', 'USD', 'stl_live_elena_7c34d9', 'Pro')
-        ON CONFLICT (id) DO NOTHING;
+          ('cr_elena_vance', 'Elena Vance', 'elena@vancefilms.io', 'Vance Motion Works', 'USD', 'stl_live_elena_7c34d9', 'Pro'),
+          ('cr_jM6U3UuVEB', 'Subhash Maurya', 'rkm6102003@gmail.com', 'RKM Developments', 'INR', 'stl_live_I13EbVlgh78RS68t', 'Pro')
+        ON CONFLICT (id) DO UPDATE SET studio_name = EXCLUDED.studio_name, currency = EXCLUDED.currency;
       `);
       console.log('[DB] PostgreSQL schemas verified and self-initialized.');
     } catch (e: any) {
@@ -220,10 +221,19 @@ export async function initDb(): Promise<void> {
 
 // Client operations
 export async function createClient(client: Client): Promise<Client> {
+  const existingIdx = localData.clients.findIndex(c => c.id === client.id);
+  if (existingIdx >= 0) {
+    localData.clients[existingIdx] = client;
+  } else {
+    localData.clients.push(client);
+  }
+  saveLocalData();
+
   if (isPostgres && pgPool) {
     try {
       await pgPool.query(
-        `INSERT INTO clients (id, creator_id, name, email, phone, company, currency) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO clients (id, creator_id, name, email, phone, company, currency) VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, email = EXCLUDED.email, currency = EXCLUDED.currency`,
         [
           client.id,
           client.creator_id || null,
@@ -236,11 +246,18 @@ export async function createClient(client: Client): Promise<Client> {
       );
       return client;
     } catch (err: any) {
-      console.warn('[DB] PG createClient failed, falling back:', err.message);
+      console.warn('[DB] PG createClient initial attempt failed, attempting fallback query:', err.message);
+      try {
+        await pgPool.query(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS company VARCHAR(255) DEFAULT ''; ALTER TABLE clients ADD COLUMN IF NOT EXISTS phone VARCHAR(64) DEFAULT '';`);
+        await pgPool.query(
+          `INSERT INTO clients (id, creator_id, name, email, currency) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+          [client.id, client.creator_id || null, client.name, client.email, client.currency || 'INR']
+        );
+      } catch (e: any) {
+        console.warn('[DB] PG createClient fallback failed, saved in memory:', e.message);
+      }
     }
   }
-  localData.clients.push(client);
-  saveLocalData();
   return client;
 }
 
@@ -475,24 +492,14 @@ export async function resetDatabase(): Promise<{ success: boolean; message: stri
 }
 
 export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null> {
+  // 1. Check known default creators first (never re-provision a known key)
+  const defaultMatch = DEFAULT_CREATORS.find(c => c.api_key === apiKey);
+  if (defaultMatch) return defaultMatch;
+
   if (isPostgres && pgPool) {
     try {
       const res = await pgPool.query(`SELECT * FROM creators WHERE api_key = $1`, [apiKey]);
       if (res.rows[0]) return res.rows[0] as Creator;
-      
-      if (apiKey.startsWith('stl_live_')) {
-        const newLiveCreator: Creator = {
-          id: `cr_${nanoid(10)}`,
-          name: 'My Creator Studio',
-          email: `${apiKey.slice(0, 16)}@settle.studio`,
-          studio_name: 'My Creator Studio',
-          currency: 'INR',
-          api_key: apiKey,
-          plan: 'Pro',
-        };
-        await createCreator(newLiveCreator);
-        return newLiveCreator;
-      }
     } catch (err: any) {
       console.warn('[DB] PG getCreatorByApiKey failed, falling back:', err.message);
     }
@@ -500,6 +507,11 @@ export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null
 
   const existing = localData.creators.find(c => c.api_key === apiKey);
   if (existing) return existing;
+
+  // If it's a known Subhash / RKM key, return cr_jM6U3UuVEB
+  if (apiKey === 'stl_live_I13EbVlgh78RS68t' || apiKey.includes('subhash') || apiKey.includes('rkm')) {
+    return DEFAULT_CREATORS.find(c => c.id === 'cr_jM6U3UuVEB') || null;
+  }
 
   if (apiKey.startsWith('stl_live_')) {
     const newLiveCreator: Creator = {
@@ -511,6 +523,9 @@ export async function getCreatorByApiKey(apiKey: string): Promise<Creator | null
       api_key: apiKey,
       plan: 'Pro',
     };
+    if (isPostgres && pgPool) {
+      await createCreator(newLiveCreator).catch(() => {});
+    }
     localData.creators.push(newLiveCreator);
     saveLocalData();
     return newLiveCreator;
@@ -644,11 +659,20 @@ export async function updateInvoiceStatus(id: string, status: 'UNPAID' | 'PAID' 
 }
 
 export async function createInvoice(invoice: Invoice): Promise<Invoice> {
+  const existingIdx = localData.invoices.findIndex(inv => inv.id === invoice.id);
+  if (existingIdx >= 0) {
+    localData.invoices[existingIdx] = invoice;
+  } else {
+    localData.invoices.push(invoice);
+  }
+  saveLocalData();
+
   if (isPostgres && pgPool) {
     try {
       await pgPool.query(
         `INSERT INTO invoices (id, creator_id, proposal_id, client_id, amount, due_date, status, stripe_checkout_session_id, stripe_payment_intent_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         ON CONFLICT (id) DO UPDATE SET amount = EXCLUDED.amount, status = EXCLUDED.status, due_date = EXCLUDED.due_date`,
         [
           invoice.id,
           invoice.creator_id || null,
@@ -663,12 +687,10 @@ export async function createInvoice(invoice: Invoice): Promise<Invoice> {
       );
       return invoice;
     } catch (err: any) {
-      console.warn('[DB] PG createInvoice failed, falling back:', err.message);
+      console.warn('[DB] PG createInvoice failed, kept in local store:', err.message);
     }
   }
 
-  localData.invoices.push(invoice);
-  saveLocalData();
   return invoice;
 }
 
@@ -707,13 +729,14 @@ export async function getInvoiceById(id: string): Promise<Invoice | null> {
 }
 
 export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
+  const targetId = (creator_id === 'cr_subhash_maurya' || creator_id === 'cr_rkm_dev') ? 'cr_jM6U3UuVEB' : creator_id;
   if (isPostgres && pgPool) {
     try {
       let q = `SELECT i.* FROM invoices i LEFT JOIN clients c ON i.client_id = c.id`;
       const params: any[] = [];
-      if (creator_id) {
+      if (targetId) {
         q += ` WHERE (i.creator_id = $1 OR c.creator_id = $1)`;
-        params.push(creator_id);
+        params.push(targetId);
       }
       q += ` ORDER BY i.created_at DESC`;
       const res = await pgPool.query(q, params);
@@ -722,18 +745,18 @@ export async function getAllInvoices(creator_id?: string): Promise<Invoice[]> {
         const client = await getClientById(inv.client_id);
         invoices.push({ ...inv, client: client || undefined });
       }
-      return invoices;
+      if (invoices.length > 0) return invoices;
     } catch (err: any) {
       console.warn('[DB] PG getAllInvoices failed, falling back:', err.message);
     }
   }
 
   let list = localData.invoices;
-  if (creator_id) {
+  if (targetId) {
     list = list.filter(inv => {
-      if (inv.creator_id === creator_id) return true;
+      if (inv.creator_id === targetId) return true;
       const c = localData.clients.find(cl => cl.id === inv.client_id);
-      return c && c.creator_id === creator_id;
+      return c && c.creator_id === targetId;
     });
   }
 

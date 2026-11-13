@@ -161,18 +161,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ creator, onSignOut, onOpen
         fetch(`${API_BASE}/api/mcp/status?${queryParam}`, { headers }).then(r => r.json()).catch(() => ({ connected: false })),
       ]);
 
-      if (meRes?.creator && meRes.creator.id && meRes.creator.id !== cur.id) {
-        const unified = {
-          ...cur,
-          id: meRes.creator.id,
-          studio_name: meRes.creator.studio_name || cur.studio_name,
-          currency: meRes.creator.currency || cur.currency,
-        };
-        setActiveCreator(unified);
+      if (meRes?.creator) {
         setCreatorProfile(prev => ({
           ...prev,
           studioName: meRes.creator.studio_name || prev.studioName,
           currency: meRes.creator.currency || prev.currency,
+          description: meRes.creator.description || prev.description,
+          website: meRes.creator.website || prev.website,
+          address: meRes.creator.address || prev.address,
         }));
       }
 
