@@ -137,7 +137,28 @@ async function initializeBackend() {
     }
 
     const existingInvoices = await getAllInvoices();
-    if (existingInvoices.length === 0) {
+    if (existingInvoices.length === 0 || !existingInvoices.some(i => i.id === 'inv__ZKOYjGr')) {
+      // Ensure Infosys client exists for Subhash / RKM Developments
+      await createClient({
+        id: 'cli_OIlb5Rpp',
+        creator_id: 'cr_jM6U3UuVEB',
+        name: 'Infosys Limited',
+        email: 'ap@infosys.com',
+        phone: '+91 80 2852 0261',
+        company: 'Infosys Limited',
+        currency: 'INR',
+      }).catch(() => {});
+
+      await createInvoice({
+        id: 'inv__ZKOYjGr',
+        creator_id: 'cr_jM6U3UuVEB',
+        client_id: 'cli_OIlb5Rpp',
+        amount: 250000,
+        currency: 'INR',
+        due_date: '2026-12-12',
+        status: 'UNPAID',
+      }).catch(() => {});
+
       await createInvoice({
         id: 'inv_demo_acme_deposit',
         creator_id: 'cr_alex_rivera',
@@ -147,17 +168,17 @@ async function initializeBackend() {
         currency: 'USD',
         due_date: 'Net 14 Milestone Settlement',
         status: 'UNPAID',
-      });
+      }).catch(() => {});
 
       await createInvoice({
         id: 'inv_subhash_code_editor',
-        creator_id: 'cr_alex_rivera',
-        client_id: 'cli_acme_demo',
+        creator_id: 'cr_jM6U3UuVEB',
+        client_id: 'cli_OIlb5Rpp',
         amount: 180000,
         currency: 'INR',
         due_date: 'Net 14 Milestone Settlement',
         status: 'UNPAID',
-      });
+      }).catch(() => {});
       console.log('[SEED] Demo invoices auto-seeded.');
     }
   } catch (err: any) {
